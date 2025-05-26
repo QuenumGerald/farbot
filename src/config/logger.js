@@ -1,9 +1,15 @@
-const winston = require('winston');
-const path = require('path');
+import winston from 'winston';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import fs from 'fs';
+import config from './index.js';
+
 const { format, transports } = winston;
 const { combine, timestamp, printf, colorize, json, errors } = format;
-const config = require('.');
-const fs = require('fs');
+
+// Equivalent à __dirname en CommonJS
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Créer le dossier de logs s'il n'existe pas
 const logDir = path.resolve(process.cwd(), config.logging.directory || 'logs');
@@ -144,9 +150,16 @@ logger.child = (context) => {
       ...childContext
     }
   });
-};
+}
 
 // Fonction utilitaire pour créer un logger pour un module spécifique
-logger.module = (moduleName) => logger.child({ module: moduleName });
+export function module(moduleName) {
+  return child({ module: moduleName });
+}
 
-module.exports = logger;
+// Fonction utilitaire pour créer un nouveau logger
+export function createLogger(moduleName) {
+  return child({ module: moduleName });
+}
+
+export default logger;

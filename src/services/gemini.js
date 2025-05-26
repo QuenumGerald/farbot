@@ -1,6 +1,8 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
-const config = require('../config');
-const logger = require('../config/logger').child({ module: 'gemini' });
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import config from '../config/index.js';
+import { createLogger } from '../config/logger.js';
+
+const logger = createLogger('gemini');
 
 // Initialiser le client Google Generative AI
 const genAI = new GoogleGenerativeAI(config.gemini.apiKey);
@@ -64,4 +66,5 @@ Réponse:`;
   }
 }
 
-module.exports = new GeminiService();
+const geminiService = new GeminiService();
+export default geminiService;

@@ -1,4 +1,13 @@
-require('dotenv').config();
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Equivalent à __dirname en ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Charger les variables d'environnement
+dotenv.config();
 
 const config = {
   // Configuration du serveur
@@ -140,4 +149,4 @@ try {
   process.exit(1);
 }
 
-module.exports = config;
+export default config;

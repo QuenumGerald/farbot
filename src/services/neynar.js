@@ -1,26 +1,35 @@
-const { NeynarAPIClient } = require('@neynar/nodejs-sdk');
-const config = require('../config');
-const logger = require('../config/logger').child({ module: 'neynar' });
+import config from '../config/index.js';
+import { createLogger } from '../config/logger.js';
+import { getNeynarAPIClient } from './neynar-wrapper.js';
+
+const logger = createLogger('neynar');
 
 class NeynarService {
   constructor() {
     if (!config.neynar.apiKey) {
       throw new Error('La clé API Neynar (NEYNAR_API_KEY) est requise dans le fichier .env');
     }
-    
-    this.client = new NeynarAPIClient(
-      config.neynar.apiKey,
-      config.neynar.apiUrl
-    );
-    
     this.signerUuid = config.neynar.signerUuid;
     this.logger = logger.child({ service: 'neynar' });
+    this.apiKey = config.neynar.apiKey;
+    this.apiUrl = config.neynar.apiUrl;
+    this.clientPromise = null;
+  }
+
+  async getClient() {
+    if (!this.clientPromise) {
+      this.clientPromise = getNeynarAPIClient().then(NeynarAPIClient =>
+        new NeynarAPIClient(this.apiKey, this.apiUrl)
+      );
+    }
+    return this.clientPromise;
   }
 
   // Récupérer les informations d'un utilisateur par son FID
   async getUserByFid(fid) {
     try {
-      const response = await this.client.fetchBulkUsers([fid]);
+      const client = await this.getClient();
+      const response = await client.fetchBulkUsers([fid]);
       const user = response.users && response.users[0];
       
       if (!user) {
@@ -44,7 +53,8 @@ class NeynarService {
         throw new Error('Le texte du cast est requis et doit être une chaîne de caractères');
       }
       
-      const cast = await this.client.publishCast(
+      const client = await this.getClient();
+      const cast = await client.publishCast(
         this.signerUuid,
         text,
         {
@@ -87,7 +97,8 @@ class NeynarService {
     }
     
     try {
-      await this.client.followUser(this.signerUuid, targetFid);
+      const client = await this.getClient();
+      await client.followUser(this.signerUuid, targetFid);
       this.logger.info(`Utilisateur suivi avec succès`, { targetFid });
       return true;
     } catch (error) {
@@ -104,7 +115,8 @@ class NeynarService {
     
     try {
       // Récupérer les informations de relation entre l'utilisateur et la cible
-      const response = await this.client.fetchUserRelationship(config.bot.fid, targetFid);
+      const client = await this.getClient();
+      const response = await client.fetchUserRelationship(config.bot.fid, targetFid);
       
       // Vérifier si l'utilisateur est déjà suivi
       const isFollowing = response?.relationship?.following || false;
@@ -128,7 +140,8 @@ class NeynarService {
     }
     
     try {
-      await this.client.unfollowUser(this.signerUuid, targetFid);
+      const client = await this.getClient();
+      await client.unfollowUser(this.signerUuid, targetFid);
       this.logger.info(`Désabonnement réussi`, { targetFid });
       return true;
     } catch (error) {
@@ -144,7 +157,8 @@ class NeynarService {
     }
     
     try {
-      await this.client.likeCast(this.signerUuid, castHash);
+      const client = await this.getClient();
+      await client.likeCast(this.signerUuid, castHash);
       this.logger.info(`Cast liké avec succès`, { castHash: castHash.substring(0, 8) + '...' });
       return true;
     } catch (error) {
@@ -161,7 +175,8 @@ class NeynarService {
     
     try {
       // Récupérer les informations du cast, y compris les réactions
-      const response = await this.client.lookUpCastByHashOrWarpcastUrl(castHash);
+      const client = await this.getClient();
+      const response = await client.lookUpCastByHashOrWarpcastUrl(castHash);
       const cast = response.cast;
       
       if (!cast) {
@@ -191,7 +206,8 @@ class NeynarService {
         throw new Error('La limite doit être comprise entre 1 et 100');
       }
       
-      const response = await this.client.fetchMentionAndReplyNotifications(limit);
+      const client = await this.getClient();
+      const response = await client.fetchMentionAndReplyNotifications(limit);
       const mentions = response.notifications || [];
       
       this.logger.debug(`${mentions.length} mentions récupérées`);
@@ -203,4 +219,5 @@ class NeynarService {
   }
 }
 
-module.exports = new NeynarService();
+const neynarService = new NeynarService();
+export default neynarService;
