@@ -50,7 +50,8 @@ export function createConfig(env = process.env) {
     // Configuration de Google Gemini
     gemini: {
       apiKey: env.GOOGLE_API_KEY,
-      model: 'gemini-2.0-flash-lite',
+      model: env.GEMINI_MODEL || 'gemini-2.0-flash-lite',
+      temperature: parseFloat(env.GEMINI_TEMPERATURE) || 1.0,
       // Paramètres de génération par défaut
       generationConfig: {
         temperature: 0.7,

@@ -10,7 +10,10 @@ const MODEL_NAME = config.gemini.model;
 
 class GeminiService {
   constructor() {
-    this.model = genAI.getGenerativeModel({ model: MODEL_NAME });
+    this.model = genAI.getGenerativeModel({
+  model: MODEL_NAME,
+  generationConfig: { temperature: config.gemini.temperature || 1.0 }
+});
   }
 
   // Générer une réponse à partir d'un message
