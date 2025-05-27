@@ -1,3 +1,4 @@
+console.log('=== DEBUT index.js ===');
 // Logs globaux pour crash Render
 process.on('uncaughtException', err => {
   console.error('Uncaught Exception:', err);
@@ -105,6 +106,8 @@ process.on('unhandledRejection', err => {
 });
 
 console.log('Clippy bot démarré sur Render !');
+
+console.log('Avant initializeBot');
 
 initializeBot().then(async bot => {
   if (bot && typeof bot.start === 'function') {
