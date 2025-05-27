@@ -1,15 +1,3 @@
-console.log('=== LOG TRES TOT index.js ===', new Date().toISOString());
-console.log('=== DEBUT index.js ===');
-// Logs globaux pour crash Render
-process.on('uncaughtException', err => {
-  console.error('Uncaught Exception:', err);
-  console.error(err && err.stack ? err.stack : '');
-});
-process.on('unhandledRejection', err => {
-  console.error('Unhandled Rejection:', err);
-  if (err && err.stack) console.error(err.stack);
-});
-
 import { createLogger } from '../config/logger.js';
 const logger = createLogger('bot');
 import ClippyBot from './clippy-extended.js';
@@ -94,8 +82,6 @@ async function shutdownBot() {
   }
 }
 
-import { initializeScheduler } from '../jobs/scheduler.js';
-
 export { initializeBot, getBot, shutdownBot };
 
 // --- Bloc de démarrage Render ---
@@ -108,35 +94,14 @@ process.on('unhandledRejection', err => {
 
 console.log('Clippy bot démarré sur Render !');
 
-console.log('Avant initializeBot');
-
-initializeBot().then(async bot => {
-  console.log('Après initializeBot');
+initializeBot().then(bot => {
   if (bot && typeof bot.start === 'function') {
-    console.log('Avant bot.start()');
     bot.start();
-    console.log('Après bot.start()');
   } else {
     setInterval(() => {}, 60 * 60 * 1000); // Garde le process vivant 1h
-    console.log('Keep-alive lancé (pas de bot.start)');
   }
-  // --- Bloc robuste : lance le scheduler pour démarrer les tâches planifiées ---
-  try {
-    console.log('Avant initializeScheduler');
-    await initializeScheduler(bot);
-    console.log('Après initializeScheduler');
-  } catch (err) {
-    console.error('Erreur dans initializeScheduler:', err);
-    if (err && err.stack) console.error(err.stack);
-    throw err;
-  }
-  console.log('Scheduler lancé !');
 }).catch(err => {
   console.error('Erreur au démarrage du bot:', err);
-  if (err && err.stack) console.error(err.stack);
   process.exit(1);
 });
-
-// --- KEEP-ALIVE Render : garde le process vivant même si aucune tâche n'est planifiée immédiatement ---
-setInterval(() => {}, 60 * 60 * 1000);
 
