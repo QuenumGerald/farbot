@@ -1,3 +1,13 @@
+// Logs globaux pour crash Render
+process.on('uncaughtException', err => {
+  console.error('Uncaught Exception:', err);
+  console.error(err && err.stack ? err.stack : '');
+});
+process.on('unhandledRejection', err => {
+  console.error('Unhandled Rejection:', err);
+  if (err && err.stack) console.error(err.stack);
+});
+
 import { createLogger } from '../config/logger.js';
 const logger = createLogger('bot');
 import ClippyBot from './clippy-extended.js';
@@ -103,7 +113,15 @@ initializeBot().then(async bot => {
     setInterval(() => {}, 60 * 60 * 1000); // Garde le process vivant 1h
   }
   // Lance le scheduler pour démarrer les tâches planifiées
-  await initializeScheduler(bot);
+  console.log('Avant initializeScheduler');
+  try {
+    await initializeScheduler(bot);
+    console.log('Après initializeScheduler');
+  } catch (err) {
+    console.error('Erreur dans initializeScheduler:', err);
+    if (err && err.stack) console.error(err.stack);
+    throw err;
+  }
   console.log('Scheduler lancé !');
 }).catch(err => {
   console.error('Erreur au démarrage du bot:', err);
