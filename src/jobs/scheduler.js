@@ -74,41 +74,63 @@ async function initializeScheduler(bot) {
     logger.info('Initialisation du planificateur BlazeJob...');
     await initScheduler();
 
-    // 1. RECHERCHE DE MOTS-CLÉS ET RÉPONSES
-    await scheduleCronTask(
+    // Utilitaire pour calculer les heures en millisecondes
+    const MINUTE = 60 * 1000;
+    const HOUR = 60 * MINUTE;
+    const DAY = 24 * HOUR;
+
+    // Utilitaire pour planifier à une heure précise
+    function getNextTimeAt(hour, minute = 0) {
+      const now = new Date();
+      const nextRun = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate(),
+        hour,
+        minute,
+        0
+      );
+      
+      // Si l'heure est déjà passée aujourd'hui, programmer pour demain
+      if (nextRun < now) {
+        nextRun.setDate(nextRun.getDate() + 1);
+      }
+      
+      return nextRun;
+    }
+
+    // 1. RECHERCHE DE MOTS-CLÉS ET RÉPONSES (toutes les 30 minutes)
+    await scheduleCustomTask(
       'recherche-mots-cles',
-      '*/7 * * * *', // Toutes les 7 minutes
       async () => {
         try {
           logger.info('🔍 Recherche de casts contenant des mots-clés...');
-          // Appeler la méthode searchAndRespondToKeywordsExtended définie dans clippy-extended.js
-          const count = await botInstance.searchAndRespondToKeywordsExtended(KEYWORDS, 20);
+          // Appeler la méthode searchAndRespondToKeywordsExtended
+          const count = await botInstance.searchAndRespondToKeywordsExtended(KEYWORDS, 5);
           logger.info(`✅ Recherche terminée. ${count} nouveau(x) cast(s) traité(s).`);
         } catch (error) {
           logger.error('❌ Erreur lors de la recherche de mots-clés:', error);
-          return { retryAfter: 300000 }; // Nouvelle tentative après 5 minutes
+          return { retryAfter: 5 * MINUTE }; // Nouvelle tentative après 5 minutes
         }
       },
       {
-        timeout: 180000, // 3 minutes
+        runEvery: TASKS_CONFIG.keywordSearch.intervalMinutes * MINUTE,
+        startAt: new Date(Date.now() + 1 * MINUTE), // Démarrer dans 1 minute
+        timeout: 3 * MINUTE,
         maxRetries: 3,
-        description: 'Recherche fréquente de casts contenant des mots-clés spécifiques',
-        priority: 10 // Haute priorité pour cette tâche critique
+        description: 'Recherche de casts contenant des mots-clés spécifiques',
+        priority: 10
       }
     );
 
-    // 2. PUBLICATIONS DE TEXTE PLANIFIÉES
+    // 2. PUBLICATIONS DE TEXTE PLANIFIÉES (aux heures définies)
     for (let i = 0; i < TASKS_CONFIG.textPublications.hours.length; i++) {
       const hour = TASKS_CONFIG.textPublications.hours[i];
       const theme = 'général';
       const name = `publication-texte-${i + 1}`;
 
-      // Créer une expression cron pour exécuter chaque jour à l'heure spécifiée
-      const cronExpression = `0 ${hour} * * *`; // Tous les jours à ${hour}:00
-
-      await scheduleCronTask(
+      await scheduleCustomTask(
         name,
-        cronExpression,
         async () => {
           try {
             logger.info(`📝 Début de la publication texte [${name}] - Thème: ${theme}`);
@@ -118,86 +140,99 @@ async function initializeScheduler(bot) {
               contentType: 'text'
             });
             logger.info(`✅ Publication texte ${name} terminée avec succès`);
+            
+            // Reprogrammer pour le lendemain à la même heure
+            return { nextRunAt: getNextTimeAt(hour) };
           } catch (error) {
             logger.error(`❌ Erreur lors de la publication texte ${name}:`, error);
-            return { retryAfter: 900000 }; // Nouvelle tentative après 15 minutes
+            return { retryAfter: 15 * MINUTE }; // Nouvelle tentative après 15 minutes
           }
         },
         {
-          timeout: 300000, // 5 minutes
+          startAt: getNextTimeAt(hour),
+          timeout: 5 * MINUTE,
           maxRetries: 2,
           description: `Publication texte quotidienne (${hour}h00) - Thème: ${theme}`,
-          priority: 5 // Priorité moyenne pour les publications planifiées
+          priority: 5
         }
       );
     }
 
-    // 3. PUBLICATIONS D'IMAGES
-    const { startHour, endHour, intervalMinutes } = TASKS_CONFIG.imagePublications;
-
-    await scheduleCronTask(
+    // 3. PUBLICATIONS D'IMAGES (2 fois par jour)
+    await scheduleCustomTask(
       'publication-images',
-      `*/${intervalMinutes} ${startHour}-${endHour} * * *`, // Toutes les X minutes entre startHour et endHour
       async () => {
         try {
-          logger.info('🖼️  Début de la publication d\'image');
+          logger.info('🖼️ Début de la publication d\'image');
           await botInstance.publishDailyContent({
             theme: 'illustration',
             withImage: true,
             contentType: 'image'
           });
           logger.info('✅ Publication d\'image terminée avec succès');
+          
+          // Calculer la prochaine exécution
+          const now = new Date();
+          const hour = now.getHours();
+          
+          // Si on est avant 16h, prochaine exécution à 22h, sinon demain à 10h
+          const nextRun = hour < 16 ? getNextTimeAt(22) : getNextTimeAt(10);
+          return { nextRunAt: nextRun };
         } catch (error) {
           logger.error('❌ Erreur lors de la publication d\'image:', error);
-          return { retryAfter: 900000 }; // Nouvelle tentative après 15 minutes
+          return { retryAfter: 15 * MINUTE };
         }
       },
       {
-        timeout: 600000, // 10 minutes pour la génération d'image
+        // Démarrer à 10h aujourd'hui ou demain selon l'heure actuelle
+        startAt: getNextTimeAt(10),
+        timeout: 10 * MINUTE,
         maxRetries: 2,
-        description: `Publication d'images toutes les ${intervalMinutes} minutes entre ${startHour}h et ${endHour}h`,
+        description: 'Publication d\'images 2 fois par jour (10h et 22h)',
         priority: 5
       }
     );
 
-    // 4. INTERACTIONS SOCIALES : LIKES
-    await scheduleCronTask(
+    // 4. INTERACTIONS SOCIALES : LIKES (toutes les heures)
+    await scheduleCustomTask(
       'likes-automatiques',
-      '*/30 * * * *', // Toutes les 30 minutes
       async () => {
         try {
           logger.info('👍 Début des likes automatiques...');
-          const likedCount = await botInstance.likeRecentCasts(10, KEYWORDS);
+          const likedCount = await botInstance.likeRecentCasts(5, KEYWORDS); // Limité à 5 likes
           logger.info(`✅ ${likedCount} cast(s) liké(s) avec succès`);
         } catch (error) {
           logger.error('❌ Erreur lors des likes automatiques:', error);
-          return { retryAfter: 300000 }; // Nouvelle tentative après 5 minutes
+          return { retryAfter: 5 * MINUTE };
         }
       },
       {
-        timeout: 300000, // 5 minutes
+        runEvery: TASKS_CONFIG.socialInteractions.likesIntervalMinutes * MINUTE,
+        startAt: new Date(Date.now() + 2 * MINUTE), // Démarrer dans 2 minutes
+        timeout: 5 * MINUTE,
         maxRetries: 2,
         description: 'Likes automatiques des contenus pertinents',
         priority: 3
       }
     );
 
-    // 5. INTERACTIONS SOCIALES : FOLLOWS
-    await scheduleCronTask(
+    // 5. INTERACTIONS SOCIALES : FOLLOWS (toutes les 4 heures)
+    await scheduleCustomTask(
       'follows-automatiques',
-      '0 */4 * * *', // Toutes les 4 heures
       async () => {
         try {
           logger.info('👥 Début des follows automatiques...');
-          const followedCount = await botInstance.followRelevantUsers(30);
+          const followedCount = await botInstance.followRelevantUsers(2); // Limité à 2 follows
           logger.info(`✅ ${followedCount} utilisateur(s) suivi(s) avec succès`);
         } catch (error) {
           logger.error('❌ Erreur lors des follows automatiques:', error);
-          return { retryAfter: 600000 }; // Nouvelle tentative après 10 minutes
+          return { retryAfter: 10 * MINUTE };
         }
       },
       {
-        timeout: 300000, // 5 minutes
+        runEvery: TASKS_CONFIG.socialInteractions.followsIntervalMinutes * MINUTE,
+        startAt: new Date(Date.now() + 5 * MINUTE), // Démarrer dans 5 minutes
+        timeout: 5 * MINUTE,
         maxRetries: 2,
         description: 'Suivi automatique des utilisateurs pertinents',
         priority: 2
