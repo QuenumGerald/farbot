@@ -39,25 +39,25 @@ const KEYWORDS = [
 const TASKS_CONFIG = {
   // Publication de contenu texte avec des heures précises
   textPublications: {
-    hours: [9, 12, 15, 18, 21]   // 5 publications par jour à des horaires fixes
+    hours: [9, 14, 19]   // 3 publications texte par jour
   },
 
   // Publication d'images/illustrations
   imagePublications: {
-    intervalMinutes: 120,          // Toutes les 2 heures
+    intervalMinutes: 720,          // 1 publication image toutes les 12h
     startHour: 10,                // Commence à 10h
     endHour: 22                   // Se termine à 22h
   },
 
   // Intégration sociale (likes, follows)
   socialInteractions: {
-    likesIntervalMinutes: 30,      // Liker des contenus pertinents toutes les 30 minutes
+    likesIntervalMinutes: 60,      // Liker des contenus pertinents toutes les heures
     followsIntervalMinutes: 240    // Suivre de nouveaux comptes pertinents toutes les 4 heures
   },
 
   // Recherche de mots-clés et réponses
   keywordSearch: {
-    intervalMinutes: 7             // Rechercher des mots-clés toutes les 7 minutes
+    intervalMinutes: 30            // Répondre toutes les 30 minutes
   }
 };
 
