@@ -1,8 +1,17 @@
-import ClippyBot from '../src/bot/clippy.js';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-// Charger les variables d'environnement
-dotenv.config();
+// Charger explicitement le .env depuis la racine
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
+
+// Import de la fonction createConfig et du ClippyBot
+import { createConfig } from '../src/config/index.js';
+import ClippyBot from '../src/bot/clippy.js';
+
+// Création explicite de la config avec les variables d'environnement chargées
+const config = createConfig(process.env);
 
 // Prendre le hash du cast à liker depuis la ligne de commande
 const TEST_CAST_HASH = process.argv[2] || 'HASH_DU_CAST_A_TESTER';

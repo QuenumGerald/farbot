@@ -9,7 +9,7 @@ const BASE_URL = 'https://api.neynar.com';
 async function getUserCasts(fid, limit = 10) {
   const url = `${BASE_URL}/v2/farcaster/feed/user/casts?fid=${fid}&limit=${limit}`;
   const response = await fetch(url, {
-    headers: { 'accept': 'application/json', 'api_key': NEYNAR_API_KEY }
+    headers: { 'accept': 'application/json', 'x-api-key': NEYNAR_API_KEY }
   });
   if (!response.ok) throw new Error(`Erreur API: ${response.statusText}`);
   const data = await response.json();

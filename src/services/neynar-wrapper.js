@@ -1,10 +1,7 @@
 // Wrapper pour le SDK Neynar pour gérer la compatibilité avec les modules ES
-let NeynarAPIClient;
+import { NeynarAPIClient, Configuration } from '@neynar/nodejs-sdk';
 
-export async function getNeynarAPIClient() {
-  if (!NeynarAPIClient) {
-    const module = await import('@neynar/nodejs-sdk');
-    NeynarAPIClient = module.NeynarAPIClient;
-  }
-  return NeynarAPIClient;
+export function getNeynarAPIClient(apiKey) {
+  const config = new Configuration({ apiKey });
+  return new NeynarAPIClient(config);
 }

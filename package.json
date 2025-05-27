@@ -30,7 +30,7 @@
   "homepage": "https://github.com/QuenumGerald/farbot#readme",
   "dependencies": {
     "@google/generative-ai": "^0.1.2",
-    "@neynar/nodejs-sdk": "^0.3.0",
+    "@neynar/nodejs-sdk": "^2.44.0",
     "axios": "^1.9.0",
     "blazerjob": "^1.0.0",
     "compression": "^1.8.0",

@@ -26,7 +26,7 @@ async function publishTestMessage() {
       },
       {
         headers: {
-          'api_key': API_KEY,
+          'x-api-key': API_KEY,
           'Content-Type': 'application/json',
           'accept': 'application/json'
         }

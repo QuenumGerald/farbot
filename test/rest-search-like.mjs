@@ -1,58 +1,24 @@
 import dotenv from 'dotenv';
-import fetch from 'node-fetch';
-
 dotenv.config();
 
-const NEYNAR_API_KEY = process.env.NEYNAR_API_KEY;
-const BASE_URL = 'https://api.neynar.com';
-const SIGNER_UUID = process.env.NEYNAR_SIGNER_UUID;
+import { NeynarAPIClient, Configuration } from "@neynar/nodejs-sdk";
+import { FeedType } from "@neynar/nodejs-sdk/build/api/index.js";
 
-async function searchCasts(keyword, limit = 5) {
-  const url = `${BASE_URL}/v2/farcaster/cast/search?q=${encodeURIComponent(keyword)}&limit=${limit}`;
-  const response = await fetch(url, {
-    headers: { 'accept': 'application/json', 'api_key': NEYNAR_API_KEY }
-  });
-  if (!response.ok) throw new Error(`Erreur API search: ${response.statusText}`);
-  const data = await response.json();
-  return data.result?.casts || [];
-}
+const config = new Configuration({
+  apiKey: process.env.NEYNAR_API_KEY,
+});
+const client = new NeynarAPIClient(config);
 
-async function likeCast(castHash) {
-  const url = `${BASE_URL}/v2/farcaster/cast/like`;
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'accept': 'application/json',
-      'api_key': NEYNAR_API_KEY,
-      'content-type': 'application/json'
-    },
-    body: JSON.stringify({
-      signer_uuid: SIGNER_UUID,
-      cast_hash: castHash
-    })
-  });
-  if (!response.ok) throw new Error(`Erreur API like: ${response.statusText}`);
-  const data = await response.json();
-  return data;
-}
-
-async function main() {
-  const keyword = process.argv[2] || 'ethereum';
-  const casts = await searchCasts(keyword, 5);
-  if (!casts.length) {
-    console.log('Aucun cast trouvé.');
-    return;
+async function fetchFollowingFeed() {
+  try {
+    const feedType = FeedType.Following;
+    const fid = 3; // Dan Romero
+    const limit = 1;
+    const feed = await client.fetchFeed({ fid, feedType, limit });
+    console.log("User Feed:", feed);
+  } catch (err) {
+    console.error("Erreur Neynar SDK:", err.message || err);
   }
-  console.log('Casts trouvés :');
-  casts.forEach((cast, i) => {
-    console.log(`[${i + 1}] ${cast.author.username} : ${cast.text}\nHash: ${cast.hash}\n`);
-  });
-
-  // Like le premier cast trouvé
-  const firstHash = casts[0].hash;
-  console.log(`Like du cast : ${firstHash}`);
-  const likeResult = await likeCast(firstHash);
-  console.log('Résultat du like :', likeResult);
 }
 
-main().catch(e => console.error(e));
+fetchFollowingFeed();

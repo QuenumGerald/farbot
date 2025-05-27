@@ -20,7 +20,7 @@ async function checkKey() {
         fids: '3', // FID de @dwr (co-fondateur de Farcaster)
         viewer_fid: 3
       },
-      headers: { 'api_key': API_KEY }
+      headers: { 'x-api-key': API_KEY }
     });
     
     console.log('✅ Clé API valide !');

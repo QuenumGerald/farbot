@@ -46,7 +46,7 @@ const cache = {
 const client = axios.create({
   baseURL: CONFIG.neynar.apiUrl,
   headers: {
-    'api_key': CONFIG.neynar.apiKey,
+    'x-api-key': CONFIG.neynar.apiKey,
     'Content-Type': 'application/json',
     'Accept': 'application/json'
   },

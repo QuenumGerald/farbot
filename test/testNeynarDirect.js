@@ -21,7 +21,7 @@ const client = axios.create({
   baseURL: 'https://api.neynar.com',
   headers: {
     'Content-Type': 'application/json',
-    'api_key': API_KEY,
+    'x-api-key': API_KEY,
   },
   timeout: 10000,
 });
