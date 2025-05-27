@@ -120,9 +120,9 @@ initializeBot().then(async bot => {
     setInterval(() => {}, 60 * 60 * 1000); // Garde le process vivant 1h
     console.log('Keep-alive lancé (pas de bot.start)');
   }
-  // Lance le scheduler pour démarrer les tâches planifiées
-  console.log('Avant initializeScheduler');
+  // --- Bloc robuste : lance le scheduler pour démarrer les tâches planifiées ---
   try {
+    console.log('Avant initializeScheduler');
     await initializeScheduler(bot);
     console.log('Après initializeScheduler');
   } catch (err) {
