@@ -1,18 +1,21 @@
-require('dotenv').config();
-const express = require('express');
-const helmet = require('helmet');
-const compression = require('compression');
-const cors = require('cors');
-const path = require('path');
+import dotenv from 'dotenv';
+dotenv.config();
+import express from 'express';
+import helmet from 'helmet';
+import compression from 'compression';
+import cors from 'cors';
+import path from 'path';
+import fs from 'fs';
 
 // Configuration et utilitaires
-const config = require('./config');
-const logger = require('./config/logger').child({ module: 'app' });
-const ErrorHandler = require('./utils/errorHandler');
+import config from './config/index.js';
+import { createLogger } from './config/logger.js';
+const logger = createLogger('app');
+import ErrorHandler from './utils/errorHandler.js';
 
 // Gestion du bot et des tâches
-const { initializeBot, shutdownBot } = require('./bot');
-const { initializeScheduler } = require('./jobs/scheduler');
+import { initializeBot, shutdownBot } from './bot/index.js';
+import { initializeScheduler } from './jobs/scheduler.js';
 
 // Initialisation de l'application Express
 const app = express();
@@ -59,7 +62,6 @@ async function start() {
     
     // Vérifier que le répertoire de données existe
     const dataDir = path.resolve(process.cwd(), './data');
-    const fs = require('fs');
     if (!fs.existsSync(dataDir)) {
       logger.debug(`Création du répertoire de données: ${dataDir}`);
       fs.mkdirSync(dataDir, { recursive: true });
@@ -154,7 +156,7 @@ signals.forEach(signal => {
 });
 
 // Démarrer l'application si appelé directement
-if (require.main === module) {
+if (import.meta.url === process.argv[1] || import.meta.url === `file://${process.argv[1]}`) {
   logger.info(`🔔 Démarrage de l'application en mode ${config.server.nodeEnv}`);
   
   start().catch((error) => {
@@ -166,8 +168,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { 
-  app, 
-  start,
-  gracefulShutdown
-};
+export { app, start, gracefulShutdown };

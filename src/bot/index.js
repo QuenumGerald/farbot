@@ -1,6 +1,9 @@
-const logger = require('../config/logger').child({ module: 'bot' });
-const ClippyBot = require('./clippy');
-const config = require('../config');
+import { createLogger } from '../config/logger.js';
+const logger = createLogger('bot');
+import ClippyBot from './clippy-extended.js';
+import config from '../config/index.js';
+import neynarService from '../services/neynar.js';
+import geminiService from '../services/gemini.js';
 
 // Instance singleton du bot
 let botInstance = null;
@@ -44,17 +47,12 @@ async function initializeBot() {
  */
 async function _checkServices() {
   try {
-    // On utilise les services via le bot
-    const bot = botInstance;
-    
     // Vérifier que Neynar est accessible en récupérant un utilisateur connu
-    await bot.neynarService.getUserByFid(1);
+    await neynarService.getUserByFid(1);
     logger.debug('Service Neynar opérationnel');
-    
     // Vérifier que Gemini est accessible en générant une réponse simple
-    await bot.geminiService.generateResponse('Test de connectivité');
+    await geminiService.generateResponse('Test de connectivité');
     logger.debug('Service Gemini opérationnel');
-    
     logger.info('Tous les services externes sont opérationnels');
     return true;
   } catch (error) {
@@ -84,8 +82,4 @@ async function shutdownBot() {
   }
 }
 
-module.exports = {
-  initializeBot,
-  getBot,
-  shutdownBot
-};
+export { initializeBot, getBot, shutdownBot };

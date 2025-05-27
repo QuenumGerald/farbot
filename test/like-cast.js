@@ -1,17 +1,21 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs';
 
-// Charger explicitement le .env depuis la racine
+// Charger manuellement le .env depuis la racine
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: path.resolve(__dirname, '../.env') });
+const envPath = path.resolve(__dirname, '../.env');
 
-// Import de la fonction createConfig et du ClippyBot
-import { createConfig } from '../src/config/index.js';
+// Lire et parser manuellement le fichier .env
+const envConfig = dotenv.parse(fs.readFileSync(envPath));
+
+// Import de la fonction getConfig et du ClippyBot
+import { getConfig } from '../src/config/index.js';
 import ClippyBot from '../src/bot/clippy.js';
 
-// Création explicite de la config avec les variables d'environnement chargées
-const config = createConfig(process.env);
+// Création explicite de la config avec les variables d'environnement chargées manuellement
+const config = getConfig(envConfig);
 
 // Prendre le hash du cast à liker depuis la ligne de commande
 const TEST_CAST_HASH = process.argv[2] || 'HASH_DU_CAST_A_TESTER';

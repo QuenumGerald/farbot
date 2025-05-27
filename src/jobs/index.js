@@ -1,7 +1,8 @@
-const { BlazeJob } = require('blazerjob');
-const path = require('path');
-const config = require('../config');
-const logger = require('../config/logger').child({ module: 'jobs' });
+import { BlazeJob } from 'blazerjob';
+import path from 'path';
+import config from '../config/index.js';
+import { createLogger } from '../config/logger.js';
+const logger = createLogger('jobs');
 
 // Définir le chemin de la base de données SQLite
 const dbPath = path.resolve(process.cwd(), config.database.connection.filename);
@@ -311,16 +312,20 @@ async function stopScheduler() {
   }
 }
 
-module.exports = {
+function getJobsState() {
+  return {
+    running: Array.from(jobsState.running),
+    completed: Array.from(jobsState.completed),
+    failed: Array.from(jobsState.failed),
+  };
+}
+
+export {
   blazeJob,
   scheduleCustomTask,
   scheduleHttpTask,
   scheduleCronTask,
   initializeScheduler,
   stopScheduler,
-  getJobsState: () => ({
-    running: Array.from(jobsState.running),
-    completed: Array.from(jobsState.completed),
-    failed: Array.from(jobsState.failed),
-  })
+  getJobsState
 };

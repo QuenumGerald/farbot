@@ -1,6 +1,7 @@
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import dotenv from 'dotenv';
 
 /**
  * Crée un objet de configuration basé sur les variables d'environnement fournies
@@ -123,8 +124,35 @@ export function createConfig(env = process.env) {
   };
 }
 
-// Création de la configuration par défaut avec process.env
-const config = createConfig();
+/**
+ * Charge automatiquement le .env et crée une configuration
+ * Cette fonction est la méthode recommandée pour obtenir la config
+ * @param {Object} customEnv - Variables d'environnement personnalisées (optionnel)
+ * @returns {Object} - La configuration complète
+ */
+export function getConfig(customEnv) {
+  // Si des variables personnalisées sont fournies, les utiliser
+  if (customEnv) {
+    return createConfig(customEnv);
+  }
+  
+  // Sinon, tenter de charger le .env automatiquement
+  try {
+    // Déterminer le chemin du .env par rapport au fichier actuel
+    const envPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../.env');
+    if (fs.existsSync(envPath)) {
+      const envConfig = dotenv.parse(fs.readFileSync(envPath));
+      return createConfig(envConfig);
+    }
+  } catch (error) {
+    console.warn('Erreur lors du chargement automatique du .env:', error.message);
+  }
+  
+  // Fallback: utiliser process.env
+  return createConfig();
+}
 
-// Export par défaut pour utilisation dans les imports
-export default config;
+// Export par défaut pour compatibilité avec les imports existants
+// ATTENTION: Ceci utilise process.env, qui peut ne pas contenir les variables
+// Il est préférable d'utiliser getConfig() directement
+export default getConfig();

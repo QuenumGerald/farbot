@@ -1,4 +1,5 @@
-const logger = require('./logger');
+import { createLogger } from '../config/logger.js';
+const logger = createLogger('errorHandler');
 
 class ErrorHandler {
   static init(process) {
@@ -63,4 +64,4 @@ class ErrorHandler {
   }
 }
 
-module.exports = ErrorHandler;
+export default ErrorHandler;

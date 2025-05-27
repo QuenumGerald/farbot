@@ -1,38 +1,60 @@
-const logger = require('../config/logger').child({ module: 'scheduler' });
-const { scheduleCustomTask, scheduleCronTask, initializeScheduler: initScheduler } = require('.');
-const config = require('../config');
+import { createLogger } from '../config/logger.js';
+const logger = createLogger('scheduler');
+import { scheduleCustomTask, scheduleCronTask, initializeScheduler as initScheduler } from './index.js';
+import config from '../config/index.js';
 
 // Référence au bot pour les tâches
 let botInstance = null;
 
 // Mots-clés à rechercher dans les casts
 const KEYWORDS = [
-  'crypto', 'web3', 'blockchain', 'nft', 'defi', 'ethereum', 'bitcoin',
-  'farcaster', 'frame', 'solana', 'base', 'warpcast', 'ai', 'ia', 'intelligence artificielle',
-  'gemini', 'claude', 'gpt', 'llm', 'ml', 'machine learning', 'zora', 'lens'
+
+  'hal finney', 'lightning network',
+  'segwit', 'bitcoin halving', 'UTXO', 'proof of work',
+  'bitcoin mining difficulty', 'bitcoin mempool', 'taproot upgrade',
+
+  // Termes Ethereum spécifiques et techniques
+  'gavin wood', 'solidity', 'ERC-20', 'EIP-1559', 'optimistic rollups',
+  'layer 2 scaling', 'serenity upgrade', 'casper protocol',
+
+  // Termes blockchain spécifiques et techniques
+  'zero knowledge proofs', 'merkle tree', 'consensus algorithm',
+  'delegated proof of stake', 'sharding implementation',
+  'blockchain interoperability', 'atomic swap', 'chainlink oracle',
+  'decentralized identity', 'evm compatibility',
+
+  // Termes tech spécifiques et profonds
+  'arm64 architecture', 'RISC processor', 'quantum computing',
+  'neural network optimization', 'IPv6 transition', 'WebAssembly',
+  'microservice architecture', 'TensorFlow implementation',
+  'CUDA parallel computing', 'serverless deployment',
+
+  // Termes Clippy et technologie rétro spécifiques
+  'leanne ruzsa-atkinson',
+  'kevan atkinson clippy', 'BonziBuddy purple gorilla', 'microsoft bob interface',
+  'windows 95 release', 'windows NT kernel', 'internet explorer 6 quirks', 'MS-DOS commands'
 ];
 
 // Configuration des différentes tâches et leurs fréquences
 const TASKS_CONFIG = {
   // Publication de contenu texte avec des heures précises
   textPublications: {
-    hours: [9, 12, 15, 18, 21],   // 5 publications par jour à des horaires fixes
-    theme: ['actualités', 'tendances', 'conseils', 'discussion', 'réflexion']
+    hours: [9, 12, 15, 18, 21]   // 5 publications par jour à des horaires fixes
   },
-  
+
   // Publication d'images/illustrations
   imagePublications: {
     intervalMinutes: 120,          // Toutes les 2 heures
     startHour: 10,                // Commence à 10h
     endHour: 22                   // Se termine à 22h
   },
-  
+
   // Intégration sociale (likes, follows)
   socialInteractions: {
     likesIntervalMinutes: 30,      // Liker des contenus pertinents toutes les 30 minutes
     followsIntervalMinutes: 240    // Suivre de nouveaux comptes pertinents toutes les 4 heures
   },
-  
+
   // Recherche de mots-clés et réponses
   keywordSearch: {
     intervalMinutes: 7             // Rechercher des mots-clés toutes les 7 minutes
@@ -47,11 +69,11 @@ const TASKS_CONFIG = {
 async function initializeScheduler(bot) {
   try {
     botInstance = bot;
-    
+
     // Initialiser le planificateur
     logger.info('Initialisation du planificateur BlazeJob...');
     await initScheduler();
-    
+
     // 1. RECHERCHE DE MOTS-CLÉS ET RÉPONSES
     await scheduleCronTask(
       'recherche-mots-cles',
@@ -59,7 +81,8 @@ async function initializeScheduler(bot) {
       async () => {
         try {
           logger.info('🔍 Recherche de casts contenant des mots-clés...');
-          const count = await botInstance.searchAndRespondToKeywords(KEYWORDS, 20);
+          // Appeler la méthode searchAndRespondToKeywordsExtended définie dans clippy-extended.js
+          const count = await botInstance.searchAndRespondToKeywordsExtended(KEYWORDS, 20);
           logger.info(`✅ Recherche terminée. ${count} nouveau(x) cast(s) traité(s).`);
         } catch (error) {
           logger.error('❌ Erreur lors de la recherche de mots-clés:', error);
@@ -73,25 +96,25 @@ async function initializeScheduler(bot) {
         priority: 10 // Haute priorité pour cette tâche critique
       }
     );
-    
+
     // 2. PUBLICATIONS DE TEXTE PLANIFIÉES
     for (let i = 0; i < TASKS_CONFIG.textPublications.hours.length; i++) {
       const hour = TASKS_CONFIG.textPublications.hours[i];
       const theme = TASKS_CONFIG.textPublications.theme[i] || 'général';
       const name = `publication-texte-${i + 1}`;
-      
+
       // Créer une expression cron pour exécuter chaque jour à l'heure spécifiée
       const cronExpression = `0 ${hour} * * *`; // Tous les jours à ${hour}:00
-      
+
       await scheduleCronTask(
         name,
         cronExpression,
         async () => {
           try {
             logger.info(`📝 Début de la publication texte [${name}] - Thème: ${theme}`);
-            await botInstance.publishDailyContent({ 
-              theme, 
-              withImage: false, 
+            await botInstance.publishDailyContent({
+              theme,
+              withImage: false,
               contentType: 'text'
             });
             logger.info(`✅ Publication texte ${name} terminée avec succès`);
@@ -108,19 +131,19 @@ async function initializeScheduler(bot) {
         }
       );
     }
-    
+
     // 3. PUBLICATIONS D'IMAGES
     const { startHour, endHour, intervalMinutes } = TASKS_CONFIG.imagePublications;
-    
+
     await scheduleCronTask(
       'publication-images',
       `*/${intervalMinutes} ${startHour}-${endHour} * * *`, // Toutes les X minutes entre startHour et endHour
       async () => {
         try {
           logger.info('🖼️  Début de la publication d\'image');
-          await botInstance.publishDailyContent({ 
-            theme: 'illustration', 
-            withImage: true, 
+          await botInstance.publishDailyContent({
+            theme: 'illustration',
+            withImage: true,
             contentType: 'image'
           });
           logger.info('✅ Publication d\'image terminée avec succès');
@@ -136,7 +159,7 @@ async function initializeScheduler(bot) {
         priority: 5
       }
     );
-    
+
     // 4. INTERACTIONS SOCIALES : LIKES
     await scheduleCronTask(
       'likes-automatiques',
@@ -158,7 +181,7 @@ async function initializeScheduler(bot) {
         priority: 3
       }
     );
-    
+
     // 5. INTERACTIONS SOCIALES : FOLLOWS
     await scheduleCronTask(
       'follows-automatiques',
@@ -166,7 +189,7 @@ async function initializeScheduler(bot) {
       async () => {
         try {
           logger.info('👥 Début des follows automatiques...');
-          const followedCount = await botInstance.followRelevantUsers(5);
+          const followedCount = await botInstance.followRelevantUsers(30);
           logger.info(`✅ ${followedCount} utilisateur(s) suivi(s) avec succès`);
         } catch (error) {
           logger.error('❌ Erreur lors des follows automatiques:', error);
@@ -180,7 +203,7 @@ async function initializeScheduler(bot) {
         priority: 2
       }
     );
-    
+
     logger.info(`🔄 Planificateur démarré avec succès à ${new Date().toISOString()}`);
     return true;
   } catch (error) {
@@ -189,8 +212,4 @@ async function initializeScheduler(bot) {
   }
 }
 
-module.exports = {
-  initializeScheduler,
-  KEYWORDS,
-  TASKS_CONFIG
-};
+export { initializeScheduler, KEYWORDS, TASKS_CONFIG };

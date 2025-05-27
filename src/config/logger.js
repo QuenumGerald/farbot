@@ -154,12 +154,12 @@ logger.child = (context) => {
 
 // Fonction utilitaire pour créer un logger pour un module spécifique
 export function module(moduleName) {
-  return child({ module: moduleName });
+  return logger.child({ module: moduleName });
 }
 
 // Fonction utilitaire pour créer un nouveau logger
 export function createLogger(moduleName) {
-  return child({ module: moduleName });
+  return logger.child({ module: moduleName });
 }
 
 export default logger;
