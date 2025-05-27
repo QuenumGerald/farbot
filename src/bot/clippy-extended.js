@@ -32,18 +32,16 @@ class ClippyBotExtended {
    * @param {string} opts.theme
    * @param {string} opts.contentType
    */
-  async publishDailyContent({ theme = 'general', withImage = false, contentType = 'text' } = {}) {
-    for (let i = 0; i < 3; i++) {
-      let post;
-      if (withImage) {
-        // Générer une image + texte
-        post = await contentGenerator.generatePostWithImage(theme);
-        await neynarService.publishCast(post.text + (post.imageUrl ? `\n${post.imageUrl}` : ''));
-      } else {
-        post = await contentGenerator.generatePost(theme);
-        await neynarService.publishCast(post);
-      }
-    }
+  /**
+   * Publie UN SEUL post généré par Gemini (texte uniquement)
+   * @param {Object} opts
+   * @param {string} opts.theme - Thème du post
+   */
+  async publishDailyContent({ theme = 'general' } = {}) {
+    // Générer UN SEUL post (jamais plus)
+    const post = await contentGenerator.generatePost(theme);
+    await neynarService.publishCast(post);
+    return post;
   }
 
   /**

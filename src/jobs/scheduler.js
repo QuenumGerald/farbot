@@ -105,8 +105,8 @@ async function initializeScheduler(bot) {
       async () => {
         try {
           logger.info('🔍 Recherche de casts contenant des mots-clés...');
-          // Appeler la méthode searchAndRespondToKeywordsExtended
-          const count = await botInstance.searchAndRespondToKeywordsExtended(KEYWORDS, 5);
+          // Appeler la méthode searchAndRespondToKeywords
+          const count = await botInstance.searchAndRespondToKeywords(KEYWORDS, 5);
           logger.info(`✅ Recherche terminée. ${count} nouveau(x) cast(s) traité(s).`);
         } catch (error) {
           logger.error('❌ Erreur lors de la recherche de mots-clés:', error);
@@ -115,7 +115,7 @@ async function initializeScheduler(bot) {
       },
       {
         runEvery: TASKS_CONFIG.keywordSearch.intervalMinutes * MINUTE,
-        startAt: new Date(Date.now() + 1 * MINUTE), // Démarrer dans 1 minute
+        startAt: new Date(Date.now() + 15 * MINUTE), // Démarrer dans 15 minutes
         timeout: 3 * MINUTE,
         maxRetries: 3,
         description: 'Recherche de casts contenant des mots-clés spécifiques',
@@ -164,10 +164,11 @@ async function initializeScheduler(bot) {
       async () => {
         try {
           logger.info('🖼️ Début de la publication d\'image');
+          // Image n'est pas supportée, on utilise juste un post texte
           await botInstance.publishDailyContent({
             theme: 'illustration',
-            withImage: true,
-            contentType: 'image'
+            withImage: false,
+            contentType: 'text'
           });
           logger.info('✅ Publication d\'image terminée avec succès');
           
@@ -208,7 +209,7 @@ async function initializeScheduler(bot) {
       },
       {
         runEvery: TASKS_CONFIG.socialInteractions.likesIntervalMinutes * MINUTE,
-        startAt: new Date(Date.now() + 2 * MINUTE), // Démarrer dans 2 minutes
+        startAt: new Date(Date.now() + 30 * MINUTE), // Démarrer dans 30 minutes
         timeout: 5 * MINUTE,
         maxRetries: 2,
         description: 'Likes automatiques des contenus pertinents',
@@ -231,7 +232,7 @@ async function initializeScheduler(bot) {
       },
       {
         runEvery: TASKS_CONFIG.socialInteractions.followsIntervalMinutes * MINUTE,
-        startAt: new Date(Date.now() + 5 * MINUTE), // Démarrer dans 5 minutes
+        startAt: new Date(Date.now() + 45 * MINUTE), // Démarrer dans 45 minutes
         timeout: 5 * MINUTE,
         maxRetries: 2,
         description: 'Suivi automatique des utilisateurs pertinents',
