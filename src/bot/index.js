@@ -1,3 +1,4 @@
+console.log('=== LOG TRES TOT index.js ===', new Date().toISOString());
 console.log('=== DEBUT index.js ===');
 // Logs globaux pour crash Render
 process.on('uncaughtException', err => {
