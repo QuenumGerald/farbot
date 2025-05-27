@@ -4,6 +4,7 @@ import ClippyBot from './clippy-extended.js';
 import config from '../config/index.js';
 import neynarService from '../services/neynar.js';
 import geminiService from '../services/gemini.js';
+import { initializeScheduler } from '../jobs/scheduler.js';
 
 // Instance singleton du bot
 let botInstance = null;
@@ -84,8 +85,6 @@ async function shutdownBot() {
 
 export { initializeBot, getBot, shutdownBot };
 
-import { initializeScheduler } from '../jobs/scheduler.js';
-
 // --- Bloc de démarrage Render ---
 process.on('uncaughtException', err => {
   console.error('Uncaught Exception:', err);
@@ -97,13 +96,23 @@ process.on('unhandledRejection', err => {
 console.log('Clippy bot démarré sur Render !');
 
 initializeBot().then(async bot => {
-  if (bot && typeof bot.start === 'function') {
-    bot.start();
+  try {
+    // Démarrage du bot si start() existe
+    if (bot && typeof bot.start === 'function') {
+      bot.start();
+      console.log('Bot.start() exécuté');
+    }
+    
+    // Initialisation du planificateur avec l'instance du bot
+    console.log('Démarrage du planificateur...');
+    const schedulerStarted = await initializeScheduler(bot);
+    console.log(schedulerStarted ? 'Planificateur démarré avec succès!' : 'Échec du démarrage du planificateur');
+    
+    // Garde le process vivant
+    setInterval(() => {}, 60 * 60 * 1000);
+  } catch (error) {
+    console.error('Erreur lors de l\'initialisation du scheduler:', error);
   }
-  // Lance le scheduler pour les tâches planifiées
-  await initializeScheduler(bot);
-  // Garde le process vivant
-  setInterval(() => {}, 60 * 60 * 1000);
 }).catch(err => {
   console.error('Erreur au démarrage du bot:', err);
   process.exit(1);
