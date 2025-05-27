@@ -110,10 +110,14 @@ console.log('Clippy bot démarré sur Render !');
 console.log('Avant initializeBot');
 
 initializeBot().then(async bot => {
+  console.log('Après initializeBot');
   if (bot && typeof bot.start === 'function') {
+    console.log('Avant bot.start()');
     bot.start();
+    console.log('Après bot.start()');
   } else {
     setInterval(() => {}, 60 * 60 * 1000); // Garde le process vivant 1h
+    console.log('Keep-alive lancé (pas de bot.start)');
   }
   // Lance le scheduler pour démarrer les tâches planifiées
   console.log('Avant initializeScheduler');
@@ -128,6 +132,7 @@ initializeBot().then(async bot => {
   console.log('Scheduler lancé !');
 }).catch(err => {
   console.error('Erreur au démarrage du bot:', err);
+  if (err && err.stack) console.error(err.stack);
   process.exit(1);
 });
 
