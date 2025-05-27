@@ -83,3 +83,25 @@ async function shutdownBot() {
 }
 
 export { initializeBot, getBot, shutdownBot };
+
+// --- Bloc de démarrage Render ---
+process.on('uncaughtException', err => {
+  console.error('Uncaught Exception:', err);
+});
+process.on('unhandledRejection', err => {
+  console.error('Unhandled Rejection:', err);
+});
+
+console.log('Clippy bot démarré sur Render !');
+
+initializeBot().then(bot => {
+  if (bot && typeof bot.start === 'function') {
+    bot.start();
+  } else {
+    setInterval(() => {}, 60 * 60 * 1000); // Garde le process vivant 1h
+  }
+}).catch(err => {
+  console.error('Erreur au démarrage du bot:', err);
+  process.exit(1);
+});
+
