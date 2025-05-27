@@ -44,6 +44,41 @@ async function startApp() {
 startApp();
 
 // Garder le processus en vie quoi qu'il arrive
-setInterval(() => {
-  console.log('Bot toujours en vie -', new Date().toISOString());
-}, 1800000); // Log toutes les 30 minutes pour montrer que le bot est vivant
+console.log('🟢 KEEPALIVE HEARTBEAT DÉMARRÉ');
+
+// Créer un fichier keepalive.txt dans le répertoire racine
+const fs = require('fs');
+const path = require('path');
+try {
+  const keepalivePath = path.join(process.cwd(), 'keepalive.txt');
+  fs.writeFileSync(keepalivePath, `Bot started at ${new Date().toISOString()}\n`);
+  console.log('Fichier keepalive créé:', keepalivePath);
+} catch (err) {
+  console.error('Erreur en créant keepalive.txt:', err);
+}
+
+// Triple sécurité : lier le processus à stdin, stdout et setInterval
+process.stdin.resume(); // Empêche Node de quitter
+
+const keepaliveInterval = setInterval(() => {
+  try {
+    console.log('🟢 Bot toujours en vie -', new Date().toISOString());
+    fs.appendFileSync(path.join(process.cwd(), 'keepalive.txt'), `Heartbeat: ${new Date().toISOString()}\n`);
+  } catch (e) {
+    console.error('Erreur heartbeat:', e);
+  }
+}, 900000); // Log toutes les 15 minutes
+
+// S'assurer que le timer ne bloque pas Node.js de se terminer proprement
+keepaliveInterval.unref();
+
+// Signal handlers pour arrêt propre si demandé
+process.on('SIGINT', () => {
+  console.log('Signal SIGINT reçu, arrêt du bot...');
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  console.log('Signal SIGTERM reçu, arrêt du bot...');
+  process.exit(0);
+});
