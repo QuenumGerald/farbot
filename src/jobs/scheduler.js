@@ -100,7 +100,7 @@ async function initializeScheduler(bot) {
     // 2. PUBLICATIONS DE TEXTE PLANIFIÉES
     for (let i = 0; i < TASKS_CONFIG.textPublications.hours.length; i++) {
       const hour = TASKS_CONFIG.textPublications.hours[i];
-      const theme = TASKS_CONFIG.textPublications.theme[i] || 'général';
+      const theme = 'général';
       const name = `publication-texte-${i + 1}`;
 
       // Créer une expression cron pour exécuter chaque jour à l'heure spécifiée

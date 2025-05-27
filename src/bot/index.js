@@ -84,6 +84,8 @@ async function shutdownBot() {
 
 export { initializeBot, getBot, shutdownBot };
 
+import { initializeScheduler } from '../jobs/scheduler.js';
+
 // --- Bloc de démarrage Render ---
 process.on('uncaughtException', err => {
   console.error('Uncaught Exception:', err);
@@ -94,12 +96,14 @@ process.on('unhandledRejection', err => {
 
 console.log('Clippy bot démarré sur Render !');
 
-initializeBot().then(bot => {
+initializeBot().then(async bot => {
   if (bot && typeof bot.start === 'function') {
     bot.start();
-  } else {
-    setInterval(() => {}, 60 * 60 * 1000); // Garde le process vivant 1h
   }
+  // Lance le scheduler pour les tâches planifiées
+  await initializeScheduler(bot);
+  // Garde le process vivant
+  setInterval(() => {}, 60 * 60 * 1000);
 }).catch(err => {
   console.error('Erreur au démarrage du bot:', err);
   process.exit(1);
