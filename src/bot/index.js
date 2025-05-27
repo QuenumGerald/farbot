@@ -128,3 +128,6 @@ initializeBot().then(async bot => {
   process.exit(1);
 });
 
+// --- KEEP-ALIVE Render : garde le process vivant même si aucune tâche n'est planifiée immédiatement ---
+setInterval(() => {}, 60 * 60 * 1000);
+
