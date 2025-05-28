@@ -16,12 +16,44 @@ class ClippyBotExtended {
    * @returns {Array} Les casts trouvés
    */
   async searchAndRespondToKeywords(keywords, limit = 20) {
+    // Obtenir les casts correspondant aux mots-clés
     const casts = await neynarService.searchCasts(keywords, limit);
     if (casts.length === 0) return [];
+    
+    // Analyser les tendances pour avoir du contexte supplémentaire
+    let contextInfo = '';
+    try {
+      const trendingTopics = await contentGenerator.analyzeTrends(10);
+      if (trendingTopics && trendingTopics.length > 0) {
+        contextInfo = `Current trending topics on Farcaster: ${trendingTopics.join(', ')}. If relevant to the user's message, you can reference these topics in your response.`;
+      }
+    } catch (error) {
+      console.error('Erreur lors de l\'analyse des tendances pour les réponses:', error);
+      // Continue même si l'analyse des tendances échoue
+    }
+    
     // Sélectionne un cast au hasard
     const randomCast = casts[Math.floor(Math.random() * casts.length)];
-    const reply = await contentGenerator.generateReply(randomCast.text);
+    
+    // Générer une réponse plus contextuelle
+    let reply;
+    
+    // Si on a du contexte des tendances, l'utiliser
+    if (contextInfo) {
+      // Générer une réponse basée sur le contexte et le message
+      reply = await contentGenerator.generateReply(randomCast.text, contextInfo);
+    } else {
+      // Fallback sur la méthode standard sans contexte
+      reply = await contentGenerator.generateReply(randomCast.text);
+    }
+    
+    // Publier la réponse
     await neynarService.replyToCast(reply, randomCast.hash);
+    
+    // Log pour le débogage
+    console.log(`[ClippyBot] Réponse générée pour le cast: "${randomCast.text?.substring(0, 30)}..."`);
+    console.log(`[ClippyBot] Réponse: "${reply}"`);
+    
     return [randomCast];
   }
 

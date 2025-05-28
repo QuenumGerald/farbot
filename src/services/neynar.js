@@ -314,6 +314,41 @@ class NeynarService {
       return false;
     }
   }
+
+  // Récupérer les casts tendance sur Farcaster
+  async getTrendingCasts(limit = 30) {
+    try {
+      this.logger.info(`Récupération des ${limit} casts tendance des dernières 12 heures`);
+      
+      // Utiliser l'API feed de Neynar pour obtenir les tendances
+      const response = await axios.get(
+        'https://api.neynar.com/v2/farcaster/feed/trending',
+        {
+          params: {
+            limit,
+            time_window: '6h' // Limiter aux tendances des dernières 12 heures
+          },
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': this.apiKey
+          }
+        }
+      );
+      
+      if (response.data && response.data.casts) {
+        this.logger.info(`${response.data.casts.length} casts tendance récupérés`);
+        return response.data.casts;
+      }
+      
+      return [];
+    } catch (error) {
+      this.logger.error(`Erreur lors de la récupération des tendances: ${error.message}`);
+      if (error.response && error.response.data) {
+        this.logger.error(`Détails de l'erreur: ${JSON.stringify(error.response.data)}`);
+      }
+      return [];
+    }
+  }
 }
 
 export default new NeynarService();

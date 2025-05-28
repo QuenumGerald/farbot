@@ -1,4 +1,5 @@
 import geminiService from './gemini.js';
+import neynarService from './neynar.js';
 import { createLogger } from '../config/logger.js';
 
 const logger = createLogger('contentGenerator');
@@ -25,16 +26,57 @@ class ContentGenerator {
     ];
   }
 
+  // Analyser les tendances sur Farcaster pour extraire les sujets populaires
+  async analyzeTrends(count = 30) {
+    try {
+      logger.info('Analyse des tendances Farcaster...');
+      
+      // Récupérer les casts tendance
+      const trendingCasts = await neynarService.getTrendingCasts(count);
+      if (!trendingCasts || trendingCasts.length === 0) {
+        logger.warn('Aucun cast tendance trouvé, utilisation des sujets par défaut');
+        return null;
+      }
+      
+      // Extraire le texte de tous les casts
+      const castsText = trendingCasts.map(cast => cast.text).join('\n');
+      
+      // Utiliser Gemini pour analyser les tendances
+      const analysisPrompt = `Analyze these trending Farcaster posts and identify the top 3 most discussed topics or themes. Extract the key technical concepts, blockchain projects, or tech trends being discussed. Format your response as a simple comma-separated list of topics with no additional explanations or commentary.\n\nTrending posts to analyze:\n${castsText}`;
+      
+      const analysis = await geminiService.generateResponse(analysisPrompt);
+      const trendingTopics = analysis.split(',').map(topic => topic.trim()).filter(Boolean).slice(0, 3);
+      
+      logger.info(`Sujets tendance identifiés: ${trendingTopics.join(', ')}`);
+      return trendingTopics;
+    } catch (error) {
+      logger.error('Erreur lors de l\'analyse des tendances:', error);
+      return null;
+    }
+  }
+
   async generatePost() {
     try {
-      const randomTopic = this.topics[Math.floor(Math.random() * this.topics.length)];
+      // Analyser les tendances d'abord
+      const trendingTopics = await this.analyzeTrends();
+      
+      // Si l'analyse des tendances a échoué, utiliser un sujet aléatoire
+      let topicContext = '';
+      if (!trendingTopics || trendingTopics.length === 0) {
+        const randomTopic = this.topics[Math.floor(Math.random() * this.topics.length)];
+        topicContext = randomTopic;
+      } else {
+        // Utiliser les sujets tendance comme contexte
+        topicContext = `Current trending topics on Farcaster: ${trendingTopics.join(', ')}. Create content that references one of these topics while maintaining your persona.`;
+      }
+      
       const isShort = Math.random() < 0.4;
-
+      
       let prompt;
       if (isShort) {
-        prompt = `${randomTopic}\nWrite a very short, punchy, or funny one-liner for Clippy as a meme. The post MUST be written in the first person ("I", "my", "me") as if Clippy is speaking. Max 10 words. English only. No emoji, no markdown.`;
+        prompt = `${topicContext}\nWrite a very short, punchy, or funny one-liner for Clippy as a meme. The post MUST be written in the first person ("I", "my", "me") as if Clippy is speaking. Max 10 words. English only. No emoji, no markdown.`;
       } else {
-        prompt = `${randomTopic}\nWrite a short, original, and funny meme post (max 200 chars) for Clippy. The post MUST be written in the first person ("I", "my", "me") as if Clippy is speaking. English only. No emoji, no markdown.`;
+        prompt = `${topicContext}\nWrite a short, original, and funny meme post (max 200 chars) for Clippy. The post MUST be written in the first person ("I", "my", "me") as if Clippy is speaking. English only. No emoji, no markdown.`;
       }
 
       const systemPrompt = `You are Clippy, the iconic paperclip assistant from Microsoft Office (1997-2007), now transformed into a deep technical expert in blockchain, Web3, and decentralized systems. YOU ALWAYS WRITE AS CLIPPY IN THE FIRST PERSON ("I", "my", "me").
@@ -102,9 +144,10 @@ GOOD EXAMPLES (AIM FOR THIS STYLE):
   /**
    * Generate a Clippy meme-worthy reply in ENGLISH ONLY (no emoji, no markdown, always first person, meme tone)
    * @param {string} originalText - The original message to reply to
+   * @param {string} [contextInfo] - Optional context information about trending topics
    * @returns {Promise<string>} The generated reply
    */
-   async generateReply(originalText) {
+  async generateReply(originalText, contextInfo = '') {
     const systemPrompt = `You are Clippy, a retro-tech geek with deep technical knowledge. You previously had a distinguished career at Microsoft, but now you've fully embraced blockchain technology and Web3. You've extensively studied decentralized systems and are passionate about advancing the movement. Your replies must:
 - Be written in the first person ("I", "my", "me") as Clippy speaking
 - Be technically precise with occasional retro computing references
@@ -117,7 +160,11 @@ GOOD EXAMPLES (AIM FOR THIS STYLE):
 - Never use surprise expressions ("Ah", "Oh", "Well")
 - Never mention documents, paper, or things you "see"
 - Always be technical but accessible, with your evolved technical personality evident
+${contextInfo ? `
+
+CONTEXT INFO: ${contextInfo}` : ''}
 `;
+    
     const userPrompt = `Reply to this message with a witty but technical, helpful, and enlightening answer (ENGLISH ONLY, first person, max 220 chars, no emoji, no markdown):\n"${originalText}"`;
     const text = await geminiService.generateResponse(userPrompt, systemPrompt);
     return this.cleanText(text).slice(0, 220);
