@@ -1,30 +1,18 @@
 import axios from 'axios';
-import { NeynarAPIClient, Configuration } from '@neynar/nodejs-sdk';
-import logger from '../config/logger.js';
-import dotenv from 'dotenv';
-
-// Charger les variables d'environnement
-dotenv.config();
+import { NeynarAPIClient } from '@neynar/nodejs-sdk';
+import config from '../config.js';
+import logger from '../logger.js';
 
 // Classe pour interagir avec l'API Neynar
 class NeynarService {
-  constructor(apiKey, signerUuid, botFid, botUsername = 'clippy') {
+  constructor(apiKey, signerUuid, botFid) {
     this.apiKey = apiKey;
     this.signerUuid = signerUuid;
     this.botFid = botFid;
-    this.botUsername = botUsername;
     this.logger = logger;
     
-    // Initialisation du client SDK officiel Neynar avec la nouvelle syntaxe de v2
-    const sdkConfig = new Configuration({
-      apiKey: apiKey,
-      baseOptions: {
-        headers: {
-          "x-neynar-experimental": true,
-        },
-      },
-    });
-    this.client = new NeynarAPIClient(sdkConfig);
+    // Initialisation du client SDK officiel Neynar
+    this.client = new NeynarAPIClient(apiKey);
   }
 
   // Rechercher des casts contenant un mot-clé
@@ -33,11 +21,28 @@ class NeynarService {
     let allResults = [];
     
     try {
-      // Essayer avec HTTP direct
+      // 1. D'abord, essayer avec le SDK officiel
+      try {
+        const response = await this.client.searchCasts({
+          query: key,
+          limit
+        });
+        
+        if (response?.casts?.length > 0) {
+          this.logger.info(`Résultat SDK pour "${key}": ${response.casts.length} casts trouvés`);
+          return response.casts;
+        } else {
+          this.logger.info(`Aucun cast trouvé pour "${key}" via SDK, essai avec HTTP direct`);
+        }
+      } catch (sdkError) {
+        this.logger.warn(`Erreur SDK lors de la recherche: ${sdkError.message}, essai avec HTTP direct`);
+      }
+      
+      // 2. Essayer avec HTTP direct si le SDK échoue
       try {
         const params = {
           q: key,
-          limit: limit,
+          limit: limit - allResults.length, // ne demande que ce qu'il manque
           ...opts // mode, sort_type, etc. si besoin
         };
         const headers = {
@@ -72,23 +77,18 @@ class NeynarService {
     try {
       this.logger.info(`Récupération des ${limit} dernières mentions du bot`);
       
-      // Utiliser l'API search pour trouver les mentions
-      const params = {
-        q: `@${this.botUsername}`,
+      // Utiliser la méthode searchUser du client SDK pour trouver les mentions
+      const response = await this.client.searchUser({
+        q: `@${config.bot.username}`,
         limit
-      };
-      const headers = {
-        'x-api-key': this.apiKey,
-        'Content-Type': 'application/json'
-      };
-      
-      const response = await axios.get('https://api.neynar.com/v2/farcaster/cast/search', { 
-        params, 
-        headers 
       });
       
       // Filter pour ne garder que les mentions dans les casts
-      const mentions = response?.data?.result?.casts || [];
+      const mentions = response?.result?.users?.filter(user => 
+        user.casts && user.casts.some(cast => 
+          cast.text.includes(`@${config.bot.username}`)
+        )
+      ) || [];
       
       this.logger.info(`${mentions.length} mentions trouvées pour le bot`);
       return mentions;
@@ -98,23 +98,16 @@ class NeynarService {
     }
   }
 
-  // Suivre un ou plusieurs utilisateurs par FID
-  async followUser(fids) {
+  // Suivre un utilisateur par FID (nouveau endpoint)
+  async followUser(fid) {
     try {
-      // Convertir en tableau si un seul FID est passé
-      const fidArray = Array.isArray(fids) ? fids : [fids];
-      
-      // Convertir tous les FIDs en nombres entiers
-      const targetFids = fidArray.map(fid => parseInt(fid, 10));
-      
-      this.logger.info(`Tentative de follow des utilisateurs FIDs: ${targetFids.join(', ')}`);
-      
+      this.logger.info(`Tentative de follow de l'utilisateur FID: ${fid}`);
       // Utilise l'endpoint officiel Neynar POST /v2/farcaster/user/follow
       const response = await axios.post(
         'https://api.neynar.com/v2/farcaster/user/follow',
         {
           signer_uuid: this.signerUuid,
-          target_fids: targetFids
+          target_fids: [parseInt(fid, 10)]
         },
         {
           headers: {
@@ -123,7 +116,6 @@ class NeynarService {
           }
         }
       );
-      
       this.logger.info(`Résultat du follow: ${JSON.stringify(response.data)}`);
       return response.data;
     } catch (error) {
@@ -135,7 +127,7 @@ class NeynarService {
     }
   }
 
-  // Ne plus suivre un utilisateur
+  // Ne plus suivre un utilisateur (nouveau endpoint)
   async unfollowUser(fid) {
     try {
       this.logger.info(`Tentative d'unfollow de l'utilisateur FID: ${fid}`);
@@ -170,34 +162,15 @@ class NeynarService {
     try {
       this.logger.info(`Tentative de like du cast: ${castHash}`);
       
-      // Vérifier si déjà liké pour éviter les doubles likes
-      try {
-        const isLiked = await this.isCastLiked(castHash);
-        if (isLiked) {
-          this.logger.info(`Cast ${castHash} déjà liké, opération ignorée.`);
-          return { success: true, alreadyLiked: true };
-        }
-      } catch (checkError) {
-        this.logger.warn(`Impossible de vérifier si déjà liké: ${checkError.message}, on continue`);
-      }
-      
-      // Utiliser l'endpoint reactions
-      const response = await axios.post(
-        'https://api.neynar.com/v2/farcaster/reaction/like',
-        {
-          signer_uuid: this.signerUuid,
-          cast_hash: castHash
-        },
-        {
-          headers: {
-            'x-api-key': this.apiKey,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
+      // Utiliser la méthode publishReaction disponible dans le client Neynar
+      const response = await this.client.publishReaction({
+        reaction_type: 'like',
+        signer_uuid: this.signerUuid,
+        target: castHash // Paramètre pour spécifier le hash du cast
+      });
       
       this.logger.info(`Like réussi pour le cast: ${castHash}`);
-      return response.data;
+      return response;
     } catch (error) {
       this.logger.error(`Erreur lors du like: ${error.message}`);
       if (error.response && error.response.data) {
@@ -213,23 +186,15 @@ class NeynarService {
     try {
       this.logger.info(`Tentative d'unlike du cast: ${castHash}`);
       
-      // Utiliser l'endpoint reactions
-      const response = await axios.post(
-        'https://api.neynar.com/v2/farcaster/reaction/unlike',
-        {
-          signer_uuid: this.signerUuid,
-          cast_hash: castHash
-        },
-        {
-          headers: {
-            'x-api-key': this.apiKey,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
+      // Utiliser la méthode publishReaction avec reaction_type = 'unlike'
+      const response = await this.client.publishReaction({
+        reaction_type: 'unlike',
+        signer_uuid: this.signerUuid,
+        target: castHash
+      });
       
       this.logger.info(`Unlike réussi pour le cast: ${castHash}`);
-      return response.data;
+      return response;
     } catch (error) {
       this.logger.error(`Erreur lors de l'unlike: ${error.message}`);
       if (error.response && error.response.data) {
@@ -244,24 +209,16 @@ class NeynarService {
     try {
       this.logger.debug(`Vérification si le cast ${castHash} est déjà liké`);
       
-      // Utiliser l'endpoint pour obtenir les réactions
-      const response = await axios.get(
-        `https://api.neynar.com/v2/farcaster/cast/${castHash}/reactions`,
-        {
-          params: {
-            reaction_type: 'like',
-            viewer_fid: this.botFid
-          },
-          headers: {
-            'x-api-key': this.apiKey,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
+      // Utiliser la méthode fetchReactionsByCast pour vérifier les likes existants
+      const response = await this.client.fetchReactionsByCast({
+        castHash,
+        type: 'like'
+      });
       
       // Vérifier si le bot est dans la liste des utilisateurs qui ont liké
-      const reactions = response?.data?.reactions || [];
-      const isLiked = reactions.some(reaction => reaction.fid === parseInt(this.botFid, 10));
+      const isLiked = response?.reactions?.some(reaction => 
+        reaction.fid === parseInt(this.botFid, 10)
+      );
       
       this.logger.debug(`Cast ${castHash} liké par le bot: ${isLiked}`);
       return isLiked;
@@ -286,8 +243,8 @@ class NeynarService {
             time_window: '6h' // Limiter aux tendances des dernières 12 heures
           },
           headers: {
-            'x-api-key': this.apiKey,
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'x-api-key': this.apiKey
           }
         }
       );
@@ -308,54 +265,18 @@ class NeynarService {
     }
   }
 
-  // Récupérer les informations d'un utilisateur par son FID
-  async getUserByFid(fid) {
-    try {
-      this.logger.info(`Récupération des informations de l'utilisateur FID: ${fid}`);
-      
-      // Utiliser l'API Neynar pour récupérer les informations de l'utilisateur
-      // L'endpoint a changé dans la nouvelle version de l'API
-      const response = await axios.get(
-        `https://api.neynar.com/v2/farcaster/user/bulk?fids=${fid}`,
-        {
-          headers: {
-            'x-api-key': this.apiKey,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-      
-      this.logger.debug(`Informations récupérées pour l'utilisateur FID ${fid}`);
-      
-      // L'API retourne maintenant un tableau d'utilisateurs
-      const users = response.data?.users || [];
-      if (users.length > 0) {
-        return users[0]; // Retourner le premier utilisateur du tableau
-      } else {
-        throw new Error(`Utilisateur avec FID ${fid} non trouvé`);
-      }
-    } catch (error) {
-      this.logger.error(`Erreur lors de la récupération de l'utilisateur: ${error.message}`);
-      if (error.response && error.response.data) {
-        this.logger.error(`Détails de l'erreur: ${JSON.stringify(error.response.data)}`);
-      }
-      throw error;
-    }
-  }
-  
   // Vérifier si le bot suit un utilisateur donné
   async checkIfFollowing(targetFid) {
     try {
       this.logger.info(`Vérification si le bot suit l'utilisateur FID: ${targetFid}`);
       
-      // Puisque l'endpoint relationship n'existe plus, nous allons récupérer la liste des utilisateurs suivis 
-      // et vérifier si targetFid est dans cette liste
+      // Utiliser une requête directe à l'API pour vérifier la relation
       const response = await axios.get(
-        `https://api.neynar.com/v2/farcaster/user/followers`,
+        `https://api.neynar.com/v2/farcaster/user/relationship`,
         {
           params: {
-            fid: targetFid,
-            limit: 100 // Augmenter si nécessaire
+            fid: this.botFid,
+            target_fid: targetFid
           },
           headers: {
             'x-api-key': this.apiKey,
@@ -364,10 +285,7 @@ class NeynarService {
         }
       );
       
-      // Rechercher le bot dans la liste des followers
-      const followers = response?.data?.followers || [];
-      const isFollowing = followers.some(follower => follower.fid === parseInt(this.botFid, 10));
-      
+      const isFollowing = response.data?.result?.following || false;
       this.logger.info(`Le bot suit l'utilisateur FID ${targetFid}: ${isFollowing}`);
       return isFollowing;
     } catch (error) {
@@ -375,21 +293,9 @@ class NeynarService {
       if (error.response && error.response.data) {
         this.logger.error(`Détails de l'erreur: ${JSON.stringify(error.response.data)}`);
       }
-      
-      this.logger.info("Impossible de vérifier avec l'API, on suppose que le follow a réussi (log blockchain)");
-      // En cas d'erreur, retourner true car le follow fonctionne, c'est juste la vérification qui échoue
-      return true;
+      return false;
     }
   }
 }
 
-// Créer une instance préconfigurée du service avec les variables d'environnement
-const neynarService = new NeynarService(
-  process.env.NEYNAR_API_KEY,
-  process.env.NEYNAR_SIGNER_UUID,
-  process.env.BOT_FID,
-  process.env.BOT_USERNAME || 'clippy'
-);
-
-// Exporter l'instance préconfigurée
-export default neynarService;
+export default NeynarService;

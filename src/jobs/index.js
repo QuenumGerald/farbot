@@ -12,7 +12,8 @@ import { dirname, resolve } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const rawPath = resolve(__dirname, '../', config.database.connection.filename);
+// Chemin ABSOLU unique pour la DB BlazeJob (adapte si besoin)
+const rawPath = '/home/nova/Documents/projects/farbot/blazerjob.db';
 const dbDir = path.dirname(rawPath);
 
 if (!fs.existsSync(dbDir)) {
@@ -130,6 +131,9 @@ async function scheduleCustomTask(name, taskFn, options = {}) {
   blazeJobOptions.onEnd = (stats) => {
     jobLogger.info(`Tâche '${name}' terminée définitivement`, { stats });
   };
+
+  // Ajout explicite du type pour BlazeJob
+  blazeJobOptions.type = 'custom';
 
   // Planifier la tâche avec BlazeJob
   try {

@@ -47,19 +47,36 @@ async function initializeBot() {
  * @private
  */
 async function _checkServices() {
+  let allServicesOk = true;
+  
+  // Vérifier que Neynar est accessible en récupérant un utilisateur connu
   try {
-    // Vérifier que Neynar est accessible en récupérant un utilisateur connu
     await neynarService.getUserByFid(1);
     logger.debug('Service Neynar opérationnel');
-    // Vérifier que Gemini est accessible en générant une réponse simple
+  } catch (neynarError) {
+    logger.error('Erreur avec le service Neynar:', neynarError);
+    // Une erreur avec Neynar est critique, on ne peut pas continuer
+    throw new Error(`Service Neynar indisponible: ${neynarError.message}`);
+  }
+  
+  // Vérifier que Gemini est accessible en générant une réponse simple
+  try {
     await geminiService.generateResponse('Test de connectivité');
     logger.debug('Service Gemini opérationnel');
-    logger.info('Tous les services externes sont opérationnels');
-    return true;
-  } catch (error) {
-    logger.error('Erreur lors de la vérification des services:', error);
-    throw new Error(`Certains services requis ne sont pas disponibles: ${error.message}`);
+  } catch (geminiError) {
+    // Les erreurs temporaires de Gemini (503, etc.) sont tolérées
+    logger.warn('Service Gemini temporairement indisponible:', geminiError.message);
+    logger.warn('Le bot continuera à fonctionner avec les réponses de secours');
+    allServicesOk = false;
   }
+  
+  if (allServicesOk) {
+    logger.info('Tous les services externes sont opérationnels');
+  } else {
+    logger.info('Bot démarré en mode dégradé (certains services indisponibles)');
+  }
+  
+  return true;
 }
 
 /**

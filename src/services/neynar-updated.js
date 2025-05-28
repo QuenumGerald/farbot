@@ -1,18 +1,14 @@
 import axios from 'axios';
 import { NeynarAPIClient, Configuration } from '@neynar/nodejs-sdk';
-import logger from '../config/logger.js';
-import dotenv from 'dotenv';
-
-// Charger les variables d'environnement
-dotenv.config();
+import config from '../config.js';
+import logger from '../logger.js';
 
 // Classe pour interagir avec l'API Neynar
 class NeynarService {
-  constructor(apiKey, signerUuid, botFid, botUsername = 'clippy') {
+  constructor(apiKey, signerUuid, botFid) {
     this.apiKey = apiKey;
     this.signerUuid = signerUuid;
     this.botFid = botFid;
-    this.botUsername = botUsername;
     this.logger = logger;
     
     // Initialisation du client SDK officiel Neynar avec la nouvelle syntaxe de v2
@@ -74,7 +70,7 @@ class NeynarService {
       
       // Utiliser l'API search pour trouver les mentions
       const params = {
-        q: `@${this.botUsername}`,
+        q: `@${config.bot.username}`,
         limit
       };
       const headers = {
@@ -98,23 +94,16 @@ class NeynarService {
     }
   }
 
-  // Suivre un ou plusieurs utilisateurs par FID
-  async followUser(fids) {
+  // Suivre un utilisateur par FID
+  async followUser(fid) {
     try {
-      // Convertir en tableau si un seul FID est passé
-      const fidArray = Array.isArray(fids) ? fids : [fids];
-      
-      // Convertir tous les FIDs en nombres entiers
-      const targetFids = fidArray.map(fid => parseInt(fid, 10));
-      
-      this.logger.info(`Tentative de follow des utilisateurs FIDs: ${targetFids.join(', ')}`);
-      
+      this.logger.info(`Tentative de follow de l'utilisateur FID: ${fid}`);
       // Utilise l'endpoint officiel Neynar POST /v2/farcaster/user/follow
       const response = await axios.post(
         'https://api.neynar.com/v2/farcaster/user/follow',
         {
           signer_uuid: this.signerUuid,
-          target_fids: targetFids
+          target_fids: [parseInt(fid, 10)]
         },
         {
           headers: {
@@ -123,7 +112,6 @@ class NeynarService {
           }
         }
       );
-      
       this.logger.info(`Résultat du follow: ${JSON.stringify(response.data)}`);
       return response.data;
     } catch (error) {
@@ -308,41 +296,6 @@ class NeynarService {
     }
   }
 
-  // Récupérer les informations d'un utilisateur par son FID
-  async getUserByFid(fid) {
-    try {
-      this.logger.info(`Récupération des informations de l'utilisateur FID: ${fid}`);
-      
-      // Utiliser l'API Neynar pour récupérer les informations de l'utilisateur
-      // L'endpoint a changé dans la nouvelle version de l'API
-      const response = await axios.get(
-        `https://api.neynar.com/v2/farcaster/user/bulk?fids=${fid}`,
-        {
-          headers: {
-            'x-api-key': this.apiKey,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-      
-      this.logger.debug(`Informations récupérées pour l'utilisateur FID ${fid}`);
-      
-      // L'API retourne maintenant un tableau d'utilisateurs
-      const users = response.data?.users || [];
-      if (users.length > 0) {
-        return users[0]; // Retourner le premier utilisateur du tableau
-      } else {
-        throw new Error(`Utilisateur avec FID ${fid} non trouvé`);
-      }
-    } catch (error) {
-      this.logger.error(`Erreur lors de la récupération de l'utilisateur: ${error.message}`);
-      if (error.response && error.response.data) {
-        this.logger.error(`Détails de l'erreur: ${JSON.stringify(error.response.data)}`);
-      }
-      throw error;
-    }
-  }
-  
   // Vérifier si le bot suit un utilisateur donné
   async checkIfFollowing(targetFid) {
     try {
@@ -383,13 +336,4 @@ class NeynarService {
   }
 }
 
-// Créer une instance préconfigurée du service avec les variables d'environnement
-const neynarService = new NeynarService(
-  process.env.NEYNAR_API_KEY,
-  process.env.NEYNAR_SIGNER_UUID,
-  process.env.BOT_FID,
-  process.env.BOT_USERNAME || 'clippy'
-);
-
-// Exporter l'instance préconfigurée
-export default neynarService;
+export default NeynarService;

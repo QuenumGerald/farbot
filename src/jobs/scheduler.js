@@ -52,7 +52,7 @@ const TASKS_CONFIG = {
   // Intégration sociale (likes, follows)
   socialInteractions: {
     likesIntervalMinutes: 60,      // Liker des contenus pertinents toutes les heures
-    followsIntervalMinutes: 240    // Suivre de nouveaux comptes pertinents toutes les 4 heures
+    followsIntervalMinutes: 1    // Suivre de nouveaux comptes pertinents toutes les 1 minute (pour debug rapide)
   },
 
   // Recherche de mots-clés et réponses
@@ -67,12 +67,15 @@ const TASKS_CONFIG = {
  * @returns {Promise<boolean>} True si l'initialisation a réussi
  */
 async function initializeScheduler(bot) {
+  console.log('>>>> DEMARRAGE initializeScheduler <<<<');
+  logger.info('➡️ Entrée dans initializeScheduler');
   try {
     botInstance = bot;
 
     // Initialiser le planificateur
     logger.info('Initialisation du planificateur BlazeJob...');
     await initScheduler();
+    console.log('>>>> BlazeJob démarré (initScheduler terminé) <<<<');
 
     // Utilitaire pour calculer les heures en millisecondes
     const MINUTE = 60 * 1000;
@@ -90,14 +93,16 @@ async function initializeScheduler(bot) {
         minute,
         0
       );
-      
+
       // Si l'heure est déjà passée aujourd'hui, programmer pour demain
       if (nextRun < now) {
         nextRun.setDate(nextRun.getDate() + 1);
       }
-      
+
       return nextRun;
     }
+
+    // Mode maintenance: uniquement les recherches/réponses, pas de publications ni de follows
 
     // 1. RECHERCHE DE MOTS-CLÉS ET RÉPONSES (toutes les 30 minutes)
     await scheduleCustomTask(
@@ -115,19 +120,18 @@ async function initializeScheduler(bot) {
       },
       {
         runEvery: TASKS_CONFIG.keywordSearch.intervalMinutes * MINUTE,
-        startAt: new Date(Date.now() + 15 * MINUTE), // Démarrer dans 15 minutes
-        timeout: 3 * MINUTE,
+        startAt: new Date(Date.now() + 1 * MINUTE), // Démarrer dans 1 minute
+        timeout: 10 * MINUTE,
         maxRetries: 3,
         description: 'Recherche de casts contenant des mots-clés spécifiques',
         priority: 10
       }
     );
 
-    // 2. PUBLICATIONS DE TEXTE PLANIFIÉES (aux heures définies)
-    for (let i = 0; i < TASKS_CONFIG.textPublications.hours.length; i++) {
-      const hour = TASKS_CONFIG.textPublications.hours[i];
-      const theme = 'général';
-      const name = `publication-texte-${i + 1}`;
+    // 2. PUBLICATIONS DE TEXTE (3 fois par jour à heures fixes)
+    for (const hour of TASKS_CONFIG.textPublications.hours) {
+      const name = `publication-texte-${TASKS_CONFIG.textPublications.hours.indexOf(hour) + 1}`;
+      const theme = 'general'; // Thème générique pour toutes les publications
 
       await scheduleCustomTask(
         name,
@@ -140,7 +144,7 @@ async function initializeScheduler(bot) {
               contentType: 'text'
             });
             logger.info(`✅ Publication texte ${name} terminée avec succès`);
-            
+
             // Reprogrammer pour le lendemain à la même heure
             return { nextRunAt: getNextTimeAt(hour) };
           } catch (error) {
@@ -158,10 +162,11 @@ async function initializeScheduler(bot) {
       );
     }
 
-    // 3. PUBLICATIONS D'IMAGES (2 fois par jour)
-    await scheduleCustomTask(
-      'publication-images',
-      async () => {
+    // logger.info('🟢 Enregistrement de la tâche "publication-images" (2 fois par jour)');
+    try {
+      await scheduleCustomTask(
+        'publication-images',
+        async () => {
         try {
           logger.info('🖼️ Début de la publication d\'image');
           // Image n'est pas supportée, on utilise juste un post texte
@@ -171,11 +176,11 @@ async function initializeScheduler(bot) {
             contentType: 'text'
           });
           logger.info('✅ Publication d\'image terminée avec succès');
-          
+
           // Calculer la prochaine exécution
           const now = new Date();
           const hour = now.getHours();
-          
+
           // Si on est avant 16h, prochaine exécution à 22h, sinon demain à 10h
           const nextRun = hour < 16 ? getNextTimeAt(22) : getNextTimeAt(10);
           return { nextRunAt: nextRun };
@@ -194,51 +199,44 @@ async function initializeScheduler(bot) {
       }
     );
 
-    // 4. INTERACTIONS SOCIALES : LIKES (toutes les heures)
+    // logger.info('🟢 Enregistrement de la tâche "likes-automatiques" (toutes les heures)');
     await scheduleCustomTask(
-      'likes-automatiques',
-      async () => {
-        try {
+        'likes-automatiques',
+        async () => {
           logger.info('👍 Début des likes automatiques...');
           const likedCount = await botInstance.likeRecentCasts(5, KEYWORDS); // Limité à 5 likes
           logger.info(`✅ ${likedCount} cast(s) liké(s) avec succès`);
-        } catch (error) {
-          logger.error('❌ Erreur lors des likes automatiques:', error);
-          return { retryAfter: 5 * MINUTE };
+        },
+        {
+          runEvery: TASKS_CONFIG.socialInteractions.likesIntervalMinutes * MINUTE,
+          startAt: new Date(Date.now() + 30 * MINUTE), // Démarrer dans 30 minutes
+          timeout: 5 * MINUTE,
+          maxRetries: 2,
+          description: 'Likes automatiques des contenus pertinents'
         }
-      },
-      {
-        runEvery: TASKS_CONFIG.socialInteractions.likesIntervalMinutes * MINUTE,
-        startAt: new Date(Date.now() + 30 * MINUTE), // Démarrer dans 30 minutes
-        timeout: 5 * MINUTE,
-        maxRetries: 2,
-        description: 'Likes automatiques des contenus pertinents',
-        priority: 3
-      }
-    );
+      );
+      logger.info('✅ Tâche "likes-automatiques" planifiée');
+    } catch (error) {
+      logger.error('❌ Erreur lors de la planification de la tâche "likes-automatiques" :', error);
+    }
 
-    // 5. INTERACTIONS SOCIALES : FOLLOWS (toutes les 4 heures)
+    // 3. FOLLOWS AUTOMATIQUES (toutes les 1 minute pour debug)
     await scheduleCustomTask(
       'follows-automatiques',
       async () => {
-        try {
-          logger.info('👥 Début des follows automatiques...');
-          const followedCount = await botInstance.followRelevantUsers(2); // Limité à 2 follows
-          logger.info(`✅ ${followedCount} utilisateur(s) suivi(s) avec succès`);
-        } catch (error) {
-          logger.error('❌ Erreur lors des follows automatiques:', error);
-          return { retryAfter: 10 * MINUTE };
-        }
+        logger.info('➕ Début des follows automatiques...');
+        const followedCount = await botInstance.followRelevantUsers(3, KEYWORDS); // Limité à 3 follows
+        logger.info(`✅ ${followedCount} compte(s) suivi(s) avec succès`);
       },
       {
         runEvery: TASKS_CONFIG.socialInteractions.followsIntervalMinutes * MINUTE,
-        startAt: new Date(Date.now() + 45 * MINUTE), // Démarrer dans 45 minutes
+        startAt: new Date(Date.now() + 5 * 1000), // Démarrer dans 5 secondes
         timeout: 5 * MINUTE,
         maxRetries: 2,
-        description: 'Suivi automatique des utilisateurs pertinents',
-        priority: 2
+        description: 'Follows automatiques des comptes pertinents'
       }
     );
+    logger.info('✅ Tâche "follows-automatiques" planifiée');
 
     logger.info(`🔄 Planificateur démarré avec succès à ${new Date().toISOString()}`);
     return true;
