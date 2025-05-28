@@ -1,6 +1,8 @@
 // Fichier de démarrage pour Render
 import { initializeBot } from './bot/index.js';
 import { initializeScheduler } from './jobs/scheduler.js';
+import fs from 'fs';
+import path from 'path';
 
 // Pour capturer les erreurs fatales
 process.on('uncaughtException', (err) => {
@@ -47,8 +49,7 @@ startApp();
 console.log('🟢 KEEPALIVE HEARTBEAT DÉMARRÉ');
 
 // Créer un fichier keepalive.txt dans le répertoire racine
-const fs = require('fs');
-const path = require('path');
+// Note: fs et path sont déjà importés en haut du fichier
 try {
   const keepalivePath = path.join(process.cwd(), 'keepalive.txt');
   fs.writeFileSync(keepalivePath, `Bot started at ${new Date().toISOString()}\n`);
