@@ -15,7 +15,7 @@ class ClippyBot {
     
     for (const cast of casts) {
       console.log(`[DEBUG ClippyBot] Génération d'une réponse pour: "${cast.text?.substring(0, 30)}..."`);
-      const prompt = `Réponds de façon drôle et concise à ce message : "${cast.text}"`;
+      const prompt = `As Clippy, the retro-tech blockchain expert, respond to this Farcaster message with technical insight and Web3 wisdom: "${cast.text}". Remember to be concise, technical, and forward-thinking about blockchain technology.`;
       const reply = await geminiService.generateResponse(prompt);
       await neynarService.replyToCast(reply, cast.hash);
     }

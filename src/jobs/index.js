@@ -5,11 +5,27 @@ import { createLogger } from '../config/logger.js';
 const logger = createLogger('jobs');
 
 // Définir le chemin de la base de données SQLite
-const dbPath = path.resolve(process.cwd(), config.database.connection.filename);
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, resolve } from 'path';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+const rawPath = resolve(__dirname, '../', config.database.connection.filename);
+const dbDir = path.dirname(rawPath);
+
+if (!fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true });
+  console.log('📁 Dossier DB créé automatiquement :', dbDir);
+} else {
+  console.log('📁 Dossier DB déjà présent :', dbDir);
+}
+
+const dbPath = rawPath;
 // Initialisation du planificateur de tâches avec BlazeJob
-const blazeJob = new BlazeJob({ 
-  dbPath, 
+const blazeJob = new BlazeJob({
+  dbPath,
   autoExit: false,  // Ne pas quitter automatiquement
   verbose: config.server.isDevelopment
 });
@@ -47,17 +63,17 @@ async function scheduleCustomTask(name, taskFn, options = {}) {
     timeout = 60000,
     description
   } = options;
-  
+
   const jobLogger = logger.child({ job: name });
-  
+
   // Wrapper pour le traitement des erreurs et la gestion du timeout
   const wrappedTaskFn = async () => {
     const taskId = Math.random().toString(36).substring(2, 15);
     jobsState.running.add(taskId);
-    
+
     const startTime = Date.now();
     jobLogger.info(`Début d'exécution: ${name}`, { taskId });
-    
+
     try {
       // Ajouter un timeout à la tâche
       const timeoutPromise = new Promise((_, reject) => {
@@ -65,62 +81,62 @@ async function scheduleCustomTask(name, taskFn, options = {}) {
           reject(new Error(`Tâche '${name}' terminée par timeout après ${timeout}ms`));
         }, timeout);
       });
-      
+
       // Exécuter la tâche avec un timeout
       const result = await Promise.race([
         taskFn(),
         timeoutPromise
       ]);
-      
+
       const duration = Date.now() - startTime;
       jobLogger.info(`Tâche '${name}' terminée avec succès en ${duration}ms`, { taskId });
-      
+
       jobsState.running.delete(taskId);
       jobsState.completed.add(taskId);
-      
+
       return result;
     } catch (error) {
       const duration = Date.now() - startTime;
-      jobLogger.error(`Échec de la tâche '${name}' après ${duration}ms:`, { 
+      jobLogger.error(`Échec de la tâche '${name}' après ${duration}ms:`, {
         error: error.message,
         stack: error.stack,
         taskId
       });
-      
+
       jobsState.running.delete(taskId);
       jobsState.failed.add(taskId);
-      
+
       throw error;
     }
   };
-  
+
   // Préparer les options pour BlazeJob
   const blazeJobOptions = {
     runAt: typeof runAt === 'string' ? new Date(runAt) : runAt,
     priority
   };
-  
+
   // Ajouter l'intervalle si présent
   if (interval && interval > 0) {
     blazeJobOptions.interval = interval;
   }
-  
+
   // Ajouter le nombre maximum d'exécutions si spécifié
   if (maxRuns && maxRuns > 0) {
     blazeJobOptions.maxRuns = maxRuns;
   }
-  
+
   // Ajouter le callback de fin d'exécution
   blazeJobOptions.onEnd = (stats) => {
     jobLogger.info(`Tâche '${name}' terminée définitivement`, { stats });
   };
-  
+
   // Planifier la tâche avec BlazeJob
   try {
     const taskId = blazeJob.schedule(wrappedTaskFn, blazeJobOptions);
-    jobLogger.info(`Tâche '${name}' planifiée avec succès`, { 
-      taskId, 
-      runAt: blazeJobOptions.runAt, 
+    jobLogger.info(`Tâche '${name}' planifiée avec succès`, {
+      taskId,
+      runAt: blazeJobOptions.runAt,
       interval: blazeJobOptions.interval,
       description
     });
@@ -144,12 +160,12 @@ async function scheduleCustomTask(name, taskFn, options = {}) {
  */
 async function scheduleHttpTask(name, httpConfig, options = {}) {
   const jobLogger = logger.child({ job: name, type: 'http' });
-  
+
   // Validation de base
   if (!httpConfig.url) {
     throw new Error(`URL requise pour la tâche HTTP '${name}'`);
   }
-  
+
   // Préparer les options pour BlazeJob
   const blazeJobOptions = {
     runAt: options.runAt ? (typeof options.runAt === 'string' ? new Date(options.runAt) : options.runAt) : new Date(),
@@ -157,24 +173,24 @@ async function scheduleHttpTask(name, httpConfig, options = {}) {
     config: JSON.stringify(httpConfig),
     priority: options.priority || 0
   };
-  
+
   // Ajouter l'intervalle si présent
   if (options.interval && options.interval > 0) {
     blazeJobOptions.interval = options.interval;
   }
-  
+
   // Ajouter le nombre maximum d'exécutions si spécifié
   if (options.maxRuns && options.maxRuns > 0) {
     blazeJobOptions.maxRuns = options.maxRuns;
   }
-  
+
   // Fonction vide car BlazeJob va exécuter la requête HTTP en fonction du type et de la config
-  const emptyFn = async () => {};
-  
+  const emptyFn = async () => { };
+
   try {
     const taskId = blazeJob.schedule(emptyFn, blazeJobOptions);
-    jobLogger.info(`Tâche HTTP '${name}' planifiée avec succès`, { 
-      taskId, 
+    jobLogger.info(`Tâche HTTP '${name}' planifiée avec succès`, {
+      taskId,
       url: httpConfig.url,
       method: httpConfig.method,
       runAt: blazeJobOptions.runAt,
@@ -198,20 +214,20 @@ async function scheduleHttpTask(name, httpConfig, options = {}) {
 async function scheduleCronTask(name, cronExpression, taskFn, options = {}) {
   // Calculer la prochaine date d'exécution selon l'expression cron
   const nextRunDate = calculateNextCronRun(cronExpression);
-  
+
   if (!nextRunDate) {
     throw new Error(`Expression cron invalide: ${cronExpression}`);
   }
-  
+
   const jobLogger = logger.child({ job: name, type: 'cron' });
   jobLogger.info(`Prochaine exécution de la tâche cron '${name}': ${nextRunDate.toISOString()}`);
-  
+
   // Planifier la tâche à exécuter à la prochaine date calculée
   const taskId = await scheduleCustomTask(name, async () => {
     try {
       // Exécuter la fonction
       await taskFn();
-      
+
       // Replanifier pour la prochaine occurrence
       const nextDate = calculateNextCronRun(cronExpression);
       if (nextDate) {
@@ -219,7 +235,7 @@ async function scheduleCronTask(name, cronExpression, taskFn, options = {}) {
       }
     } catch (error) {
       jobLogger.error(`Erreur lors de l'exécution de la tâche cron '${name}':`, error);
-      
+
       // Replanifier malgré l'erreur pour la prochaine occurrence
       const nextDate = calculateNextCronRun(cronExpression);
       if (nextDate) {
@@ -230,7 +246,7 @@ async function scheduleCronTask(name, cronExpression, taskFn, options = {}) {
     ...options,
     runAt: nextRunDate
   });
-  
+
   return taskId;
 }
 
@@ -243,25 +259,25 @@ function calculateNextCronRun(cronExpression) {
   try {
     // Implémentation simplifiée: pour une vraie application, utiliser node-cron ou cron-parser
     const [minute, hour, dayOfMonth, month, dayOfWeek] = cronExpression.split(' ');
-    
+
     const now = new Date();
     const nextRun = new Date(now);
-    
+
     // Traitement simple pour les expressions basiques comme "0 9 * * *" (tous les jours à 9h)
     if (minute === '0' && !isNaN(parseInt(hour))) {
       nextRun.setHours(parseInt(hour));
       nextRun.setMinutes(0);
       nextRun.setSeconds(0);
       nextRun.setMilliseconds(0);
-      
+
       // Si l'heure est déjà passée aujourd'hui, passer au jour suivant
       if (nextRun <= now) {
         nextRun.setDate(nextRun.getDate() + 1);
       }
-      
+
       return nextRun;
     }
-    
+
     // Pour les cas plus complexes, on simule une heure plus tard pour les tests
     // Dans une vraie implémentation, utiliser une bibliothèque de cron
     logger.warn(`Expression cron complexe '${cronExpression}' non complètement supportée, utilisation d'une approximation`);
@@ -279,15 +295,15 @@ function calculateNextCronRun(cronExpression) {
 async function initializeScheduler() {
   try {
     logger.info('Initialisation du planificateur BlazeJob...');
-    
+
     // Ajouter un écouteur pour les tâches terminées
     blazeJob.onAllTasksEnded(() => {
       logger.info('Toutes les tâches périodiques sont terminées');
     });
-    
+
     // Démarrer le planificateur
     await blazeJob.start();
-    
+
     logger.info('Planificateur BlazeJob démarré avec succès');
     return blazeJob;
   } catch (error) {
