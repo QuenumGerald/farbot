@@ -1,6 +1,8 @@
 import { createLogger } from '../config/logger.js';
 const logger = createLogger('scheduler');
 import cron from 'node-cron';
+import { generatePost } from '../services/ai.js';
+import { postCast } from '../services/poster.js';
 import config from '../config/index.js';
 
 // Référence au bot pour les tâches
@@ -34,6 +36,9 @@ const KEYWORDS = [
   'kevan atkinson clippy', 'BonziBuddy purple gorilla', 'microsoft bob interface',
   'windows 95 release', 'windows NT kernel', 'internet explorer 6 quirks', 'MS-DOS commands'
 ];
+
+// Keywords for the user follow task
+const FOLLOW_KEYWORDS = ['decentralized social media', 'web3 community', 'farcaster dev', 'crypto innovation', 'NFT artists'];
 
 // Configuration des différentes tâches et leurs fréquences
 const TASKS_CONFIG = {
@@ -153,8 +158,70 @@ async function initializeScheduler(bot) {
   });
 
   logger.info('🟢 Toutes les tâches cron sont planifiées.');
+
+  // 6. Daily AI Content Posting
+  cron.schedule('0 10 * * *', async () => {
+    logger.info('🌟 Starting Daily AI Content Posting task...');
+    try {
+      // Define a prompt for the AI. This can be customized.
+      const prompt = "Generate a short, insightful, and slightly humorous observation about the future of decentralized technology or AI, in less than 200 characters. Maintain a positive and curious tone.";
+      
+      logger.info('🤖 Generating content with AI...');
+      const contentToPost = await generatePost(prompt);
+      
+      if (contentToPost) {
+        logger.info(`✍️ AI Generated Content: "${contentToPost}"`);
+        logger.info('🚀 Posting content to Farcaster...');
+        await postCast(contentToPost);
+        logger.info('✅ Daily AI Content successfully posted to Farcaster.');
+      } else {
+        logger.warn('🤔 AI did not return content. Skipping post.');
+      }
+    } catch (error) {
+      logger.error('❌ Error during Daily AI Content Posting task:', {
+        message: error.message,
+        stack: error.stack,
+      });
+      // Consider if specific error handling for missing API key for Deepseek is needed here
+      // For example, if error.message.includes('DEEPSEEK_API_KEY')
+      if (error.message && error.message.includes('DEEPSEEK_API_KEY')) {
+        logger.error('👉 Make sure the DEEPSEEK_API_KEY environment variable is set.');
+      }
+    }
+  });
+
+  // 7. Keyword-based User Follow task
+  cron.schedule('0 1 * * *', async () => { // Run daily at 1:00 AM
+    if (!botInstance || typeof botInstance.followUsersByKeywords !== 'function') {
+      logger.error('Follow task: botInstance is not available or followUsersByKeywords method is missing.');
+      return;
+    }
+    
+    logger.info('🌟 Starting Keyword-based User Follow task...');
+    try {
+      // Use the predefined list of keywords
+      // In a production setup, these keywords might come from config or a database
+      const keywordsToUse = FOLLOW_KEYWORDS; 
+      if (!keywordsToUse || keywordsToUse.length === 0) {
+        logger.warn('No keywords defined for the follow task. Skipping.');
+        return;
+      }
+
+      logger.info(`🤖 Following users based on keywords: "${keywordsToUse.join(', ')}"`);
+      const summary = await botInstance.followUsersByKeywords(keywordsToUse);
+      
+      logger.info('✅ Keyword-based User Follow task completed.', summary);
+
+    } catch (error) {
+      logger.error('❌ Error during Keyword-based User Follow task:', {
+        message: error.message,
+        stack: error.stack,
+      });
+    }
+  });
+
   return true;
 }
 
-export { initializeScheduler, KEYWORDS, TASKS_CONFIG };
+export { initializeScheduler, KEYWORDS, TASKS_CONFIG, FOLLOW_KEYWORDS };
 
