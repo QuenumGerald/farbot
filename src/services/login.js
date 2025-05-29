@@ -2,11 +2,13 @@ import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import fs from 'fs';
 import path from 'path';
+// import { createLogger } from '../config/logger.js'; // Optional
+// const logger = createLogger('login-service'); // Optional
 
 // Apply the stealth plugin
 puppeteer.use(StealthPlugin());
 
-const USER_DATA_DIR = path.resolve('./user_data');
+const userDataDir = path.resolve(process.cwd(), './user_data');
 
 /**
  * Launches a Puppeteer browser instance, navigates to Warpcast,
@@ -15,65 +17,77 @@ const USER_DATA_DIR = path.resolve('./user_data');
  */
 async function getFarcasterPage() {
   // Ensure user_data directory exists
-  if (!fs.existsSync(USER_DATA_DIR)) {
-    fs.mkdirSync(USER_DATA_DIR, { recursive: true });
+  if (!fs.existsSync(userDataDir)) {
+    // logger.info(`Creating user data directory: ${userDataDir}`);
+    fs.mkdirSync(userDataDir, { recursive: true });
   }
 
+  // logger.info('Launching browser...');
   const browser = await puppeteer.launch({
-    headless: false, // Headful mode to allow for manual login
-    userDataDir: USER_DATA_DIR, // Persist user sessions and cookies
+    headless: false,
+    userDataDir: userDataDir,
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
+      '--disable-dev-shm-usage', // Often needed in CI/Docker environments
       '--disable-accelerated-2d-canvas',
       '--no-first-run',
       '--no-zygote',
-      // '--single-process', // Disabling this as it might cause issues with stealth plugin or extensions
-      '--disable-gpu'
+      // '--single-process', // Only if not using headless:false, and if issues arise
+      '--disable-gpu' // Often needed in CI/Docker environments
     ]
   });
 
   const page = await browser.newPage();
+  // logger.info('Browser launched, new page created.');
 
   try {
-    // Navigate to a page that requires login to check status
-    await page.goto('https://warpcast.com/~/settings', { waitUntil: 'networkidle2' });
-    const currentUrl = page.url();
+    // logger.info('Checking login status by navigating to settings...');
+    await page.goto('https://warpcast.com/~/settings', { waitUntil: 'networkidle2', timeout: 60000 });
 
-    // If not on the settings page or redirected to a page containing 'login', user is not logged in
-    if (!currentUrl.includes('/~/settings') || currentUrl.includes('login')) {
-      console.log('Not logged into Warpcast or session expired. Navigating to login page...');
-      await page.goto('https://warpcast.com', { waitUntil: 'networkidle2' });
-      console.log('Please log in to Warpcast manually in the browser window.');
-      console.log('The script will attempt to continue after detecting a successful login (navigation to https://warpcast.com/)...');
+    // If it redirects to /login, or shows login elements, user is not logged in.
+    // A more robust check would be to look for a specific element only present on the settings page when logged in,
+    // or checking if the current URL is still /~/settings.
+    if (page.url().includes('/login')) { // Simple check, might need to be more robust
+      // logger.info('Not logged in. Navigating to Warpcast for manual login.');
+      await page.goto('https://warpcast.com', { waitUntil: 'networkidle2', timeout: 60000 });
+      console.log('[LOGIN REQUIRED] Please log in to Warpcast in the browser window. Waiting for you to complete...');
+      // logger.info('[LOGIN REQUIRED] Please log in to Warpcast in the browser window. Waiting for you to complete...');
 
-      // Wait for successful login, indicated by navigation to the main feed URL
-      // This might need adjustment based on actual Warpcast redirect behavior after login
+      // Wait for user to login. This can be tricky.
+      // Option 1: Wait for navigation away from a page that includes /login or to the homepage after login.
+      // Option 2: Wait for a specific element that appears only when logged in.
+      // Option 3: Wait for a significant URL change that indicates login.
+      // For this implementation, let's wait for either the URL to NOT include '/login' anymore,
+      // or for a known post-login element (e.g., a feed element).
+      // We'll use a long timeout to give the user ample time.
       await page.waitForFunction(
-        () => window.location.href === 'https://warpcast.com/' || 
-              !window.location.href.includes('login') && document.querySelector('nav a[href="/"]') !== null,
+        () => !window.location.pathname.includes('/login') && (document.querySelector('article') || document.querySelector('[data-testid="feed-item"]')), // Example selectors
         { timeout: 300000 } // 5 minutes timeout for manual login
       );
-      console.log('Login detected or timeout reached. Assuming login was successful if not timed out.');
-      // Navigate to settings again to confirm or to be on a known page
-      await page.goto('https://warpcast.com/~/settings', { waitUntil: 'networkidle2' });
-      if (!page.url().includes('/~/settings')) {
-        console.warn('Still not on settings page. Login might have failed or taken too long.');
-      } else {
-        console.log('Successfully navigated to Warpcast settings. Logged in.');
-      }
+      // logger.info('Login detected or timeout reached.');
     } else {
-      console.log('Already logged into Warpcast.');
+      // logger.info('User is already logged in.');
     }
+    // At this point, the page should be logged in.
+    // Return the page, but not the browser. The caller of getFarcasterPage might want to do more with this browser instance.
+    // However, if each call to getFarcasterPage is meant to be self-contained for one operation, then browser should be closed by the function that uses the page.
+    // For the current design (e.g., poster.js calling it once per post), keeping browser open and returning page is fine.
+    // The browser will be closed by the main script or when the process ends.
+    // If multiple services use getFarcasterPage, a shared browser instance management might be better.
+    // For now, let's assume the page object is returned and the browser remains open.
+    // The responsibility to close the browser will be on the process that initially calls this.
+    // This is a simplification. A more robust solution might involve a browser manager service.
+    return page;
   } catch (error) {
-    console.error('Error during Warpcast login check:', error);
-    // Optionally, close the browser or rethrow, depending on desired error handling
-    // await browser.close();
-    // throw error;
+    // logger.error('Error in getFarcasterPage:', { message: error.message, stack: error.stack });
+    // If an error occurs, try to close the browser before throwing
+    if (browser) {
+      // logger.info('Closing browser due to error in getFarcasterPage.');
+      await browser.close();
+    }
+    throw error;
   }
-
-  return page;
 }
 
 export { getFarcasterPage };

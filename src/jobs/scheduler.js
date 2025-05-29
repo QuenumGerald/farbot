@@ -161,31 +161,32 @@ async function initializeScheduler(bot) {
 
   // 6. Daily AI Content Posting
   cron.schedule('0 10 * * *', async () => {
-    logger.info('🌟 Starting Daily AI Content Posting task...');
+    logger.info('🌟 Starting Daily AI Content Posting task (Reintegration)...');
     try {
-      // Define a prompt for the AI. This can be customized.
-      const prompt = "Generate a short, insightful, and slightly humorous observation about the future of decentralized technology or AI, in less than 200 characters. Maintain a positive and curious tone.";
+      const prompt = "Generate a short, insightful, and slightly humorous observation about the future of decentralized technology or AI, in less than 200 characters. Maintain a positive and curious tone. This is a reintegration test.";
       
-      logger.info('🤖 Generating content with AI...');
+      logger.info(`🤖 Generating content with AI using prompt: "${prompt.substring(0,50)}..."`);
       const contentToPost = await generatePost(prompt);
       
-      if (contentToPost) {
+      if (contentToPost && contentToPost.trim() !== '') {
         logger.info(`✍️ AI Generated Content: "${contentToPost}"`);
         logger.info('🚀 Posting content to Farcaster...');
-        await postCast(contentToPost);
-        logger.info('✅ Daily AI Content successfully posted to Farcaster.');
+        const success = await postCast(contentToPost);
+        if (success) {
+          logger.info('✅ Daily AI Content successfully posted to Farcaster.');
+        } else {
+          logger.error('❌ Failed to post Daily AI Content to Farcaster after retries.');
+        }
       } else {
-        logger.warn('🤔 AI did not return content. Skipping post.');
+        logger.warn('🤔 AI did not return content or content was empty. Skipping post.');
       }
     } catch (error) {
-      logger.error('❌ Error during Daily AI Content Posting task:', {
+      logger.error('❌ Error during Daily AI Content Posting task (Reintegration):', {
         message: error.message,
         stack: error.stack,
       });
-      // Consider if specific error handling for missing API key for Deepseek is needed here
-      // For example, if error.message.includes('DEEPSEEK_API_KEY')
       if (error.message && error.message.includes('DEEPSEEK_API_KEY')) {
-        logger.error('👉 Make sure the DEEPSEEK_API_KEY environment variable is set.');
+        logger.error('👉 Crucial: Make sure the DEEPSEEK_API_KEY environment variable is correctly set for the application.');
       }
     }
   });
