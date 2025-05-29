@@ -14,6 +14,16 @@ const __dirname = path.dirname(__filename);
 // Créer le dossier de logs s'il n'existe pas
 const logDir = path.resolve(process.cwd(), config.logging.directory || 'logs');
 
+// Assure-toi que le répertoire de logs existe
+try {
+  if (!fs.existsSync(logDir)) {
+    fs.mkdirSync(logDir, { recursive: true });
+    console.log(`Répertoire de logs créé: ${logDir}`);
+  }
+} catch (error) {
+  console.error(`Erreur lors de la création du répertoire de logs: ${error.message}`);
+}
+
 // Format personnalisé pour la sortie console
 const consoleFormat = printf(({ level, message, timestamp, stack, ...meta }) => {
   // Extraire les métadonnées pour un affichage plus propre
@@ -90,6 +100,21 @@ if (config.server.isProduction && config.logging.files.debug) {
       ),
       maxsize: config.logging.maxSize || 10 * 1024 * 1024,
       maxFiles: config.logging.maxFiles || 5,
+    })
+  );
+}
+
+// S'assurer qu'il y a toujours au moins un transport, même si la création des fichiers échoue
+if (transportsList.length === 0) {
+  console.warn('Aucun transport configuré pour Winston. Ajout d\'un transport console par défaut.');
+  transportsList.push(
+    new transports.Console({
+      format: combine(
+        colorize(),
+        timestamp({ format: config.logging.dateFormat || 'YYYY-MM-DD HH:mm:ss' }),
+        errors({ stack: true }),
+        consoleFormat
+      )
     })
   );
 }

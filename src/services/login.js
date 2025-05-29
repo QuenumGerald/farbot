@@ -15,76 +15,92 @@ const userDataDir = path.resolve(process.cwd(), './user_data');
  * and handles login if necessary.
  * @returns {Promise<import('puppeteer').Page>} Puppeteer page object authenticated with Warpcast.
  */
+// Variable globale pour stocker le navigateur et la page entre les appels
+let globalBrowser = null;
+let globalPage = null;
+
 async function getFarcasterPage() {
+  console.log('>>> Appel de getFarcasterPage()');
+  
+  // Si une instance de navigateur existe, on la ferme d'abord
+  if (globalBrowser) {
+    console.log('>>> Fermeture de l\'instance Puppeteer existante');
+    try {
+      if (globalPage) {
+        await globalPage.close().catch(e => console.warn('Erreur fermeture page:', e.message));
+        globalPage = null;
+      }
+      await globalBrowser.close().catch(e => console.warn('Erreur fermeture navigateur:', e.message));
+      globalBrowser = null;
+      // Attendre un peu pour que le système libère les ressources
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    } catch (closeError) {
+      console.warn('Erreur lors de la fermeture du navigateur:', closeError.message);
+      // On continue malgré l'erreur
+    }
+  }
+
+  // Supprimer le fichier de verrouillage s'il existe
+  const lockFile = path.join(userDataDir, 'SingletonLock');
+  if (fs.existsSync(lockFile)) {
+    console.log('>>> Suppression du fichier de verrouillage SingletonLock');
+    try {
+      fs.unlinkSync(lockFile);
+    } catch (unlinkErr) {
+      console.warn('Impossible de supprimer le fichier de verrouillage:', unlinkErr.message);
+    }
+  }
+  
   // Ensure user_data directory exists
   if (!fs.existsSync(userDataDir)) {
-    // logger.info(`Creating user data directory: ${userDataDir}`);
     fs.mkdirSync(userDataDir, { recursive: true });
   }
 
-  // logger.info('Launching browser...');
-  const browser = await puppeteer.launch({
+  console.log('>>> Lancement du navigateur Puppeteer');
+  globalBrowser = await puppeteer.launch({
     headless: false,
     userDataDir: userDataDir,
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage', // Often needed in CI/Docker environments
+      '--disable-dev-shm-usage',
       '--disable-accelerated-2d-canvas',
       '--no-first-run',
       '--no-zygote',
-      // '--single-process', // Only if not using headless:false, and if issues arise
-      '--disable-gpu' // Often needed in CI/Docker environments
+      '--disable-gpu'
     ]
   });
 
-  const page = await browser.newPage();
-  // logger.info('Browser launched, new page created.');
+  globalPage = await globalBrowser.newPage();
+  console.log('>>> Page Puppeteer créée');
 
   try {
-    // logger.info('Checking login status by navigating to settings...');
-    await page.goto('https://warpcast.com/~/settings', { waitUntil: 'networkidle2', timeout: 60000 });
+    // Aller directement sur Farcaster.xyz (nouveau portail)
+    await globalPage.goto('https://farcaster.xyz/', { waitUntil: 'networkidle2', timeout: 60000 });
 
-    // If it redirects to /login, or shows login elements, user is not logged in.
-    // A more robust check would be to look for a specific element only present on the settings page when logged in,
-    // or checking if the current URL is still /~/settings.
-    if (page.url().includes('/login')) { // Simple check, might need to be more robust
-      // logger.info('Not logged in. Navigating to Warpcast for manual login.');
-      await page.goto('https://warpcast.com', { waitUntil: 'networkidle2', timeout: 60000 });
-      console.log('[LOGIN REQUIRED] Please log in to Warpcast in the browser window. Waiting for you to complete...');
-      // logger.info('[LOGIN REQUIRED] Please log in to Warpcast in the browser window. Waiting for you to complete...');
+    // Si on est redirigé vers un login ou qu'on voit un écran de connexion, attendre la connexion utilisateur
+    if (globalPage.url().includes('/login')) {
+      console.log('[LOGIN REQUIRED] Veuillez vous connecter à Farcaster dans la fenêtre du navigateur. En attente...');
 
-      // Wait for user to login. This can be tricky.
-      // Option 1: Wait for navigation away from a page that includes /login or to the homepage after login.
-      // Option 2: Wait for a specific element that appears only when logged in.
-      // Option 3: Wait for a significant URL change that indicates login.
-      // For this implementation, let's wait for either the URL to NOT include '/login' anymore,
-      // or for a known post-login element (e.g., a feed element).
-      // We'll use a long timeout to give the user ample time.
-      await page.waitForFunction(
-        () => !window.location.pathname.includes('/login') && (document.querySelector('article') || document.querySelector('[data-testid="feed-item"]')), // Example selectors
-        { timeout: 300000 } // 5 minutes timeout for manual login
+      // Attendre que l'utilisateur se connecte
+      await globalPage.waitForFunction(
+        () => !window.location.pathname.includes('/login') && (document.querySelector('article') || document.querySelector('[data-testid="feed-item"]')),
+        { timeout: 300000 } // 5 minutes pour la connexion manuelle
       );
-      // logger.info('Login detected or timeout reached.');
+      console.log('>>> Connexion détectée');
     } else {
-      // logger.info('User is already logged in.');
+      console.log('>>> Utilisateur déjà connecté');
     }
-    // At this point, the page should be logged in.
-    // Return the page, but not the browser. The caller of getFarcasterPage might want to do more with this browser instance.
-    // However, if each call to getFarcasterPage is meant to be self-contained for one operation, then browser should be closed by the function that uses the page.
-    // For the current design (e.g., poster.js calling it once per post), keeping browser open and returning page is fine.
-    // The browser will be closed by the main script or when the process ends.
-    // If multiple services use getFarcasterPage, a shared browser instance management might be better.
-    // For now, let's assume the page object is returned and the browser remains open.
-    // The responsibility to close the browser will be on the process that initially calls this.
-    // This is a simplification. A more robust solution might involve a browser manager service.
-    return page;
+    
+    return globalPage;
   } catch (error) {
-    // logger.error('Error in getFarcasterPage:', { message: error.message, stack: error.stack });
-    // If an error occurs, try to close the browser before throwing
-    if (browser) {
-      // logger.info('Closing browser due to error in getFarcasterPage.');
-      await browser.close();
+    console.error('Erreur dans getFarcasterPage:', error.message);
+    // En cas d'erreur, fermer le navigateur avant de lancer l'exception
+    if (globalBrowser) {
+      console.log('>>> Fermeture du navigateur suite à une erreur');
+      await globalBrowser.close();
+      globalBrowser = null;
+      globalPage = null;
     }
     throw error;
   }

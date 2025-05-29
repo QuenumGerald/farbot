@@ -1,5 +1,4 @@
 import geminiService from './gemini.js';
-import neynarService from './neynar.js';
 import { createLogger } from '../config/logger.js';
 
 const logger = createLogger('contentGenerator');
@@ -24,7 +23,7 @@ class ContentGenerator {
       "I'm running my ethics through a permissionless ledger",
       "I'm balancing digital liberties with analog nostalgia"
     ];
-    
+
     // Liste de messages prédéfinis pour le fallback quand Gemini n'est pas disponible
     this.fallbackMessages = [
       "From helping with documents to verifying blockchain transactions. My career upgrade is complete.",
@@ -49,23 +48,23 @@ class ContentGenerator {
   async analyzeTrends(count = 30) {
     try {
       logger.info('Analyse des tendances Farcaster...');
-      
+
       // Récupérer les casts tendance
       const trendingCasts = await neynarService.getTrendingCasts(count);
       if (!trendingCasts || trendingCasts.length === 0) {
         logger.warn('Aucun cast tendance trouvé, utilisation des sujets par défaut');
         return null;
       }
-      
+
       // Extraire le texte de tous les casts
       const castsText = trendingCasts.map(cast => cast.text).join('\n');
-      
+
       // Utiliser Gemini pour analyser les tendances
       const analysisPrompt = `Analyze these trending Farcaster posts and identify the top 3 most discussed topics or themes. Extract the key technical concepts, blockchain projects, or tech trends being discussed. Format your response as a simple comma-separated list of topics with no additional explanations or commentary.\n\nTrending posts to analyze:\n${castsText}`;
-      
+
       const analysis = await geminiService.generateResponse(analysisPrompt);
       const trendingTopics = analysis.split(',').map(topic => topic.trim()).filter(Boolean).slice(0, 3);
-      
+
       logger.info(`Sujets tendance identifiés: ${trendingTopics.join(', ')}`);
       return trendingTopics;
     } catch (error) {
@@ -78,7 +77,7 @@ class ContentGenerator {
     try {
       // Analyser les tendances d'abord
       const trendingTopics = await this.analyzeTrends();
-      
+
       // Si l'analyse des tendances a échoué, utiliser un sujet aléatoire
       let topicContext = '';
       if (!trendingTopics || trendingTopics.length === 0) {
@@ -88,9 +87,9 @@ class ContentGenerator {
         // Utiliser les sujets tendance comme contexte
         topicContext = `Current trending topics on Farcaster: ${trendingTopics.join(', ')}. Create content that references one of these topics while maintaining your persona.`;
       }
-      
+
       const isShort = Math.random() < 0.4;
-      
+
       let prompt;
       if (isShort) {
         prompt = `${topicContext}\nWrite a very short, punchy, or funny one-liner for Clippy as a meme. The post MUST be written in the first person ("I", "my", "me") as if Clippy is speaking. Max 10 words. English only. No emoji, no markdown.`;
@@ -122,7 +121,7 @@ class ContentGenerator {
       return this.cleanText(text);
     } catch (error) {
       logger.error('Error generating post:', error);
-      
+
       // FALLBACK: Si Gemini échoue, utiliser un message prédéfini
       logger.info('Gemini indisponible, utilisation d\'un message fallback prédéfini');
       const randomFallbackIndex = Math.floor(Math.random() * this.fallbackMessages.length);
@@ -162,7 +161,7 @@ ${contextInfo ? `
 
 CONTEXT INFO: ${contextInfo}` : ''}
 `;
-    
+
     const userPrompt = `Reply to this message with a witty but technical, helpful, and enlightening answer (ENGLISH ONLY, first person, max 220 chars, no emoji, no markdown):\n"${originalText}"`;
     const text = await geminiService.generateResponse(userPrompt, systemPrompt);
     return this.cleanText(text).slice(0, 220);

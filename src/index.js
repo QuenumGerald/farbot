@@ -1,41 +1,42 @@
+console.log('>>> Début absolu de index.js');
 import dotenv from 'dotenv';
+console.log('>>> Après import dotenv');
 dotenv.config();
+console.log('>>> Après dotenv.config()');
 import express from 'express';
-import helmet from 'helmet';
-import compression from 'compression';
-import cors from 'cors';
+console.log('>>> Après import express');
 import path from 'path';
-import fs from 'fs';
-
-// Configuration et utilitaires
-import config from './config/index.js';
+console.log('>>> Après import path');
+import { fileURLToPath } from 'url';
+console.log('>>> Après import fileURLToPath');
 import { createLogger } from './config/logger.js';
-const logger = createLogger('app');
-import ErrorHandler from './utils/errorHandler.js';
+console.log('>>> Après import createLogger');
+import { getFarcasterPage } from './services/login.js';
+console.log('>>> Après import getFarcasterPage');
+import { initializeScheduler } from './scheduler.js';
+console.log('>>> Après import initializeScheduler');
 
-// Gestion du bot et des tâches
-import { initializeBot, shutdownBot } from './bot/index.js';
-import { initializeScheduler } from './jobs/scheduler.js';
+const logger = createLogger('app');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Configuration
+const PORT = process.env.PORT || 3000;
+const NODE_ENV = process.env.NODE_ENV || 'development';
 
 // Initialisation de l'application Express
 const app = express();
-const PORT = config.server.port;
 
 // Middleware de base
-app.use(helmet()); // Sécurisation des en-têtes HTTP
-app.use(compression()); // Compression des réponses
-app.use(cors()); // Gestion des CORS
-app.use(express.json({ limit: '10kb' })); // Parser JSON avec une limite de taille
-app.use(express.urlencoded({ extended: true, limit: '10kb' })); // Parser les données de formulaire
+app.use(express.json({ limit: '10kb' }));
+app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
-// Route de santé (utile pour les vérifications de disponibilité)
+// Route de santé
 app.get('/health', (req, res) => {
   res.status(200).json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    service: config.bot.displayName,
-    version: process.env.npm_package_version || 'development',
-    environment: config.server.nodeEnv
+    environment: NODE_ENV
   });
 });
 
@@ -47,9 +48,6 @@ app.use((req, res) => {
   });
 });
 
-// Gestionnaire d'erreurs global
-app.use(ErrorHandler.middleware());
-
 // Gestion des erreurs non capturées
 ErrorHandler.init(process);
 
@@ -57,6 +55,12 @@ ErrorHandler.init(process);
 let botInstance = null;
 
 async function start() {
+  try {
+    console.log('>>> [DEBUG] Entrée dans start()');
+  } catch (e) {
+    console.error('>>> [ERREUR] Exception tout début de start():', e);
+  }
+  console.log('>>> Début de start()');
   try {
     logger.info('🚀 Démarrage de Clippy Bot...');
     
@@ -71,9 +75,10 @@ async function start() {
     logger.debug('Initialisation du bot...');
     botInstance = await initializeBot();
     
-    // Initialiser le planificateur de tâches
-    logger.debug('Initialisation du planificateur de tâches...');
-    await initializeScheduler(botInstance);
+    // Ouvre Puppeteer même si la recherche est désactivée
+    console.log('>>> Avant getFarcasterPage()');
+    await getFarcasterPage();
+    console.log('>>> Après getFarcasterPage()');
     
     // Fonction d'arrêt gracieux globale
     global.shutdown = async () => {
@@ -155,17 +160,17 @@ signals.forEach(signal => {
   });
 });
 
-// Démarrer l'application si appelé directement
-if (import.meta.url === process.argv[1] || import.meta.url === `file://${process.argv[1]}`) {
-  logger.info(`🔔 Démarrage de l'application en mode ${config.server.nodeEnv}`);
-  
-  start().catch((error) => {
-    logger.error('Erreur fatale lors du démarrage:', { 
-      error: error.message,
-      stack: error.stack
-    });
-    process.exit(1);
-  });
-}
+// Démarrage direct du bot à chaque exécution
+start().catch((error) => {
+  console.error('Erreur fatale lors du démarrage:', error);
+  process.exit(1);
+});
 
 export { app, start, gracefulShutdown };
+
+// Démarrage effectif du bot (ouvre Puppeteer)
+console.log('>>> AVANT start() tout en bas');
+start().catch((error) => {
+  console.error('Erreur fatale lors du démarrage:', error);
+  process.exit(1);
+});

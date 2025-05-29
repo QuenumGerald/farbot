@@ -1,0 +1,6 @@
+2025/05/29-23:14:01.313 45555 Reusing MANIFEST /home/nova/Documents/projects/farbot/user_data/Default/Local Storage/leveldb/MANIFEST-000001
+2025/05/29-23:14:01.317 45555 Recovering log #140
+2025/05/29-23:14:01.317 45555 Reusing old log /home/nova/Documents/projects/farbot/user_data/Default/Local Storage/leveldb/000140.log 
+2025/05/29-23:14:10.057 45558 Level-0 table #145: started
+2025/05/29-23:14:10.068 45558 Level-0 table #145: 68338 bytes OK
+2025/05/29-23:14:10.076 45558 Delete type=0 #140

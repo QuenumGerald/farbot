@@ -35,10 +35,10 @@ async function postCast(content) {
       await page.goto('https://warpcast.com/compose', { waitUntil: 'networkidle2', timeout: 60000 });
       // logger.debug('Navigated to /compose.');
       // console.log('Navigated to /compose.');
-      
+
       // Selector for the text area - needs verification by the user
       const textAreaSelector = 'textarea[aria-label="Cast text input"]';
-      await page.waitForSelector(textAreaSelector, { visible: true, timeout: 30000 });
+      await page.waitForSelector(textAreaSelector, { visible: true, timeout: 5000 });
       // logger.debug('Text area found.');
       // console.log('Text area found.');
       await page.type(textAreaSelector, content);
@@ -54,7 +54,7 @@ async function postCast(content) {
       }
       // logger.debug('Cast button found.');
       // console.log('Cast button found.');
-      
+
       await castButton.click();
       // logger.debug('Cast button clicked.');
       // console.log('Cast button clicked.');
@@ -66,7 +66,7 @@ async function postCast(content) {
       // For simplicity, let's wait for the text area to disappear or a short timeout
       // This is a heuristic and might need adjustment based on actual Warpcast behavior.
       await page.waitForFunction(
-        (selector) => !document.querySelector(selector), 
+        (selector) => !document.querySelector(selector),
         { timeout: 15000 }, // 15 seconds for post to go through and UI to change
         textAreaSelector
       ).catch(() => {
@@ -75,7 +75,7 @@ async function postCast(content) {
         // No re-throw here, proceed to close page and assume success for now if no other error.
         // A more robust check would be to navigate to user's profile and see the cast.
       });
-      
+
       // logger.info(`Cast posted successfully (attempt ${attempt}/${MAX_RETRIES}).`);
       // console.log(`Cast posted successfully (attempt ${attempt}/${MAX_RETRIES}).`);
       if (page && !page.isClosed()) {
