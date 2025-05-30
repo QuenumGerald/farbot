@@ -1,16 +1,9 @@
-2025/05/30-20:32:01.423 5f3ce Reusing MANIFEST /home/nova/Documents/projects/farbot/user_data/persistent_profile/Default/Local Storage/leveldb/MANIFEST-000001
-2025/05/30-20:32:01.428 5f3ce Recovering log #108
-2025/05/30-20:32:01.432 5f3ce Level-0 table #111: started
-2025/05/30-20:32:01.439 5f3ce Level-0 table #111: 138744 bytes OK
-2025/05/30-20:32:01.446 5f3ce Delete type=0 #108
-2025/05/30-20:32:01.447 5f3cf Compacting 4@0 + 1@1 files
-2025/05/30-20:32:01.460 5f3cf Generated table #113@0: 146 keys, 152504 bytes
-2025/05/30-20:32:01.460 5f3cf Compacted 4@0 + 1@1 files => 152504 bytes
-2025/05/30-20:32:01.467 5f3cf compacted to: files[ 0 1 1 0 0 0 0 ]
-2025/05/30-20:32:01.469 5f3cf Delete type=2 #105
-2025/05/30-20:32:01.469 5f3cf Delete type=2 #111
-2025/05/30-20:32:01.469 5f3cf Delete type=2 #103
-2025/05/30-20:32:01.469 5f3cf Delete type=2 #106
-2025/05/30-20:32:01.469 5f3cf Delete type=2 #109
-2025/05/30-20:33:00.089 5f3cf Level-0 table #115: started
-2025/05/30-20:33:00.096 5f3cf Level-0 table #115: 67318 bytes OK
+2025/05/30-21:05:01.373 60d56 Reusing MANIFEST /home/nova/Documents/projects/farbot/user_data/persistent_profile/Default/Local Storage/leveldb/MANIFEST-000001
+2025/05/30-21:05:01.378 60d56 Recovering log #154
+2025/05/30-21:05:01.378 60d56 Reusing old log /home/nova/Documents/projects/farbot/user_data/persistent_profile/Default/Local Storage/leveldb/000154.log 
+2025/05/30-21:05:32.140 60d57 Level-0 table #159: started
+2025/05/30-21:05:32.148 60d57 Level-0 table #159: 66202 bytes OK
+2025/05/30-21:05:32.155 60d57 Delete type=0 #154
+2025/05/30-21:06:01.380 60d56 Level-0 table #161: started
+2025/05/30-21:06:01.388 60d56 Level-0 table #161: 119925 bytes OK
+2025/05/30-21:06:01.395 60d56 Delete type=0 #158

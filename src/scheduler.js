@@ -45,7 +45,7 @@ function updateHistory(authorId, history) {
 // Répondre automatiquement à des messages contenant un mot-clé toutes les heures
 // Recherche automatique désactivée temporairement
 
-cron.schedule('*/5 * * * *', async () => {
+cron.schedule('*/30 * * * *', async () => {
   logger.info('Début du job planifié : recherche et réponse automatique aux messages...');
   const history = loadHistory();
   let nbReplies = 0;
@@ -58,46 +58,46 @@ cron.schedule('*/5 * * * *', async () => {
         logger.info(`Déjà répondu à ${author} il y a moins de 15 jours, on ignore.`);
         return null;
       }
-      
-      logger.info(`Génération d'une réponse avec Gemini pour ${author} au sujet de "${content.substring(0, 50)}..."`); 
-      
+
+      logger.info(`Génération d'une réponse avec Gemini pour ${author} au sujet de "${content.substring(0, 50)}..."`);
+
       // Générer la réponse avec l'API Gemini
       const generatedResponse = await contentGenerator.generateReply(content, author);
-      
+
       if (generatedResponse) {
         logger.info(`Réponse générée: ${generatedResponse.substring(0, 50)}...`);
-        
+
         // Enregistrer dans l'historique (on utilisera un ID fictif puisqu'on n'a pas l'URL)
         const historyKey = `${author}-${Date.now()}`;
-        history[historyKey] = { 
+        history[historyKey] = {
           author: author,
           date: new Date().toISOString(),
           responded: true
         };
         saveHistory(history);
-        
+
         return generatedResponse;
       }
-      
+
       return null;
     };
-    
+
     // Répond maintenant aux messages du fil d'accueil (home)
     const repliesCount = await socialActions.replyOnHomeTimeline(
       generateResponseWithHistory, // Fonction pour générer les réponses
-      3                           // Maximum 3 réponses par cycle
+      1                           // Maximum 3 réponses par cycle
       // Vous pouvez ajouter un tableau de mots-clés ici si besoin
     );
     nbReplies = repliesCount;
     // Vérifier si la fonctionnalité de suivi est activée dans la configuration
     const config = (await import('./config/index.js')).default;
-    
+
     if (config.features?.userFollowing) {
       // Après avoir répondu aux messages, faire une recherche et follow d'un utilisateur si activé
       logger.info('Début de la recherche et follow d\'utilisateurs crypto...');
       // Réinitialiser followCount
       followCount = 0;
-      
+
       try {
         // Chercher uniquement "crypto" et suivre 1 personne pour le test
         followCount = await socialActions.searchAndFollowUsers(
@@ -124,15 +124,15 @@ cron.schedule('*/5 * * * *', async () => {
 cron.schedule('0 0 * * *', async () => {
   // Vérifier si la fonctionnalité de suivi est activée dans la configuration
   const config = (await import('./config/index.js')).default;
-  
+
   if (!config.features?.userFollowing) {
     logger.info('Fonctionnalité de suivi désactivée dans la configuration, tâche annulée.');
     return;
   }
-  
+
   logger.info('Début du job planifié : recherche et follow automatique d\'utilisateurs...');
   let followCount = 0;
-  
+
   try {
     // Suivre jusqu'à 5 nouveaux utilisateurs qui parlent de crypto ou technologies liées
     followCount = await socialActions.searchAndFollowUsers(
