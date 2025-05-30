@@ -1,23 +1,6 @@
-2025/05/29-23:12:00.321 451c7 Reusing MANIFEST /home/nova/Documents/projects/farbot/user_data/Default/Local Storage/leveldb/MANIFEST-000001
-2025/05/29-23:12:00.334 451c7 Recovering log #130
-2025/05/29-23:12:00.336 451c7 Level-0 table #134: started
-2025/05/29-23:12:00.348 451c7 Level-0 table #134: 66631 bytes OK
-2025/05/29-23:12:00.360 451c7 Delete type=0 #130
-2025/05/29-23:12:14.072 451c8 Level-0 table #137: started
-2025/05/29-23:12:14.132 451c8 Level-0 table #137: 61475 bytes OK
-2025/05/29-23:12:14.141 451c8 Delete type=0 #135
-2025/05/29-23:13:00.196 451c8 Level-0 table #139: started
-2025/05/29-23:13:00.210 451c8 Level-0 table #139: 65046 bytes OK
-2025/05/29-23:13:00.222 451c8 Delete type=0 #136
-2025/05/29-23:13:00.368 451c7 Level-0 table #141: started
-2025/05/29-23:13:00.381 451c7 Level-0 table #141: 99086 bytes OK
-2025/05/29-23:13:00.390 451c7 Delete type=0 #138
-2025/05/29-23:13:00.392 451c7 Compacting 4@0 + 1@1 files
-2025/05/29-23:13:00.406 451c7 Generated table #142@0: 16 keys, 109380 bytes
-2025/05/29-23:13:00.406 451c7 Compacted 4@0 + 1@1 files => 109380 bytes
-2025/05/29-23:13:00.413 451c7 compacted to: files[ 0 1 0 0 0 0 0 ]
-2025/05/29-23:13:00.416 451c7 Delete type=2 #141
-2025/05/29-23:13:00.416 451c7 Delete type=2 #132
-2025/05/29-23:13:00.416 451c7 Delete type=2 #137
-2025/05/29-23:13:00.416 451c7 Delete type=2 #139
-2025/05/29-23:13:00.416 451c7 Delete type=2 #134
+2025/05/30-01:42:31.739 4cf5a Reusing MANIFEST /home/nova/Documents/projects/farbot/user_data/Default/Local Storage/leveldb/MANIFEST-000001
+2025/05/30-01:42:31.753 4cf5a Recovering log #448
+2025/05/30-01:42:31.755 4cf5a Reusing old log /home/nova/Documents/projects/farbot/user_data/Default/Local Storage/leveldb/000448.log 
+2025/05/30-01:42:41.858 4cf5a Level-0 table #451: started
+2025/05/30-01:42:41.868 4cf5a Level-0 table #451: 53888 bytes OK
+2025/05/30-01:42:41.878 4cf5a Delete type=0 #448

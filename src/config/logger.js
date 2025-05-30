@@ -104,20 +104,18 @@ if (config.server.isProduction && config.logging.files.debug) {
   );
 }
 
-// S'assurer qu'il y a toujours au moins un transport, même si la création des fichiers échoue
-if (transportsList.length === 0) {
-  console.warn('Aucun transport configuré pour Winston. Ajout d\'un transport console par défaut.');
-  transportsList.push(
-    new transports.Console({
-      format: combine(
-        colorize(),
-        timestamp({ format: config.logging.dateFormat || 'YYYY-MM-DD HH:mm:ss' }),
-        errors({ stack: true }),
-        consoleFormat
-      )
-    })
-  );
-}
+// Toujours ajouter un transport Console en développement, indépendamment des autres conditions
+// Cela résout le problème "Attempt to write logs with no transports"
+transportsList.push(
+  new transports.Console({
+    format: combine(
+      colorize(),
+      timestamp({ format: config.logging.dateFormat || 'YYYY-MM-DD HH:mm:ss' }),
+      errors({ stack: true }),
+      consoleFormat
+    )
+  })
+);
 
 // Création du logger principal
 const logger = winston.createLogger({

@@ -1,0 +1,9 @@
+2025/05/30-20:33:01.359 5f6c9 Reusing MANIFEST /home/nova/Documents/projects/farbot/user_data/persistent_profile/Default/Local Storage/leveldb/MANIFEST-000001
+2025/05/30-20:33:01.362 5f6c9 Recovering log #112
+2025/05/30-20:33:01.364 5f6c9 Level-0 table #115: started
+2025/05/30-20:33:01.384 5f6c9 Level-0 table #115: 67318 bytes OK
+2025/05/30-20:33:01.387 5f6c9 Recovering log #114
+2025/05/30-20:33:01.390 5f6c9 Level-0 table #116: started
+2025/05/30-20:33:01.399 5f6c9 Level-0 table #116: 162272 bytes OK
+2025/05/30-20:33:01.406 5f6c9 Delete type=0 #114
+2025/05/30-20:33:01.406 5f6c9 Delete type=0 #112

@@ -9,12 +9,16 @@ import path from 'path';
 console.log('>>> Après import path');
 import { fileURLToPath } from 'url';
 console.log('>>> Après import fileURLToPath');
+import fs from 'fs';
+console.log('>>> Après import fs');
 import { createLogger } from './config/logger.js';
 console.log('>>> Après import createLogger');
 import { getFarcasterPage } from './services/login.js';
 console.log('>>> Après import getFarcasterPage');
 import { initializeScheduler } from './scheduler.js';
 console.log('>>> Après import initializeScheduler');
+import config from './config/index.js';
+console.log('>>> Après import config');
 
 const logger = createLogger('app');
 const __filename = fileURLToPath(import.meta.url);
@@ -48,8 +52,8 @@ app.use((req, res) => {
   });
 });
 
-// Gestion des erreurs non capturées
-ErrorHandler.init(process);
+// Gestion des erreurs non capturées via le logger
+// Les erreurs sont déjà capturées par notre configuration de logger.js
 
 // Référence au bot pour l'arrêt gracieux
 let botInstance = null;
@@ -73,7 +77,7 @@ async function start() {
 
     // Initialiser le bot
     logger.debug('Initialisation du bot...');
-    botInstance = await initializeBot();
+    botInstance = await initializeScheduler();
     
     // Ouvre Puppeteer même si la recherche est désactivée
     console.log('>>> Avant getFarcasterPage()');
@@ -122,7 +126,17 @@ async function gracefulShutdown() {
     // Arrêt du bot
     if (botInstance) {
       logger.debug('Arrêt du bot...');
-      await shutdownBot();
+      // Fermeture de la page Puppeteer si disponible dans le botInstance
+      if (botInstance.close) {
+        await botInstance.close();
+      } else {
+        // Essayer de fermer la page Puppeteer via la fonction globale
+        try {
+          await getFarcasterPage().then(page => page.browser().close());
+        } catch (err) {
+          logger.debug('Impossible de fermer la page Puppeteer:', err.message);
+        }
+      }
     }
     
     // Arrêt du planificateur de tâches (si méthode disponible)
@@ -160,15 +174,10 @@ signals.forEach(signal => {
   });
 });
 
-// Démarrage direct du bot à chaque exécution
-start().catch((error) => {
-  console.error('Erreur fatale lors du démarrage:', error);
-  process.exit(1);
-});
-
+// Export des fonctions et objets principaux
 export { app, start, gracefulShutdown };
 
-// Démarrage effectif du bot (ouvre Puppeteer)
+// Démarrage effectif du bot (un seul appel)
 console.log('>>> AVANT start() tout en bas');
 start().catch((error) => {
   console.error('Erreur fatale lors du démarrage:', error);

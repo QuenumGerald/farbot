@@ -1,4 +1,4 @@
-import axios from 'axios';
+import { getFarcasterPage } from './login.js';
 
 /**
  * Recherche des utilisateurs sur Farcaster par mot-clé
@@ -6,41 +6,89 @@ import axios from 'axios';
  * @returns {Promise<Array>} - Tableau d'objets utilisateur avec { username, displayName, fid, ... }
  */
 export async function searchUsersByKeywords(keyword) {
+  // Utiliser Puppeteer au lieu d'appels API directs
+  let page = null;
   try {
-    const url = `https://farcaster.xyz/~/search/users?q=${encodeURIComponent(keyword)}`;
-    const response = await axios.get(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        'Accept': 'application/json',
-      },
-    });
-
-    // Si la réponse est en HTML (au lieu de JSON), c'est qu'il y a un problème
-    if (typeof response.data === 'string' && response.data.includes('<!DOCTYPE html>')) {
-      throw new Error('La réponse est en HTML au lieu de JSON. Vérifiez l\'URL et les en-têtes.');
+    // Tentatives multiples pour gérer les erreurs de connexion
+    let attempts = 0;
+    const maxAttempts = 3;
+    
+    while (attempts < maxAttempts) {
+      try {
+        page = await getFarcasterPage();
+        
+        // Utiliser l'URL de recherche d'utilisateurs
+        const searchUrl = `https://farcaster.xyz/~/search/users?q=${encodeURIComponent(keyword)}`;
+        console.log(`Recherche d'utilisateurs en cours sur: ${searchUrl} (tentative ${attempts + 1}/${maxAttempts})`);
+        
+        // Tentative de navigation avec timeout plus long
+        await page.goto(searchUrl, { waitUntil: 'networkidle2', timeout: 15000 });
+        break; // Si la navigation réussit, sortir de la boucle
+      } catch (navigationError) {
+        attempts++;
+        console.log(`Erreur de navigation (tentative ${attempts}/${maxAttempts}):`, navigationError.message);
+        
+        // Si c'est la dernière tentative, remonter l'erreur
+        if (attempts >= maxAttempts) throw navigationError;
+        
+        // Sinon, attendre et réessayer
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Fermer la page pour en créer une nouvelle
+        if (page) {
+          try {
+            await page.close().catch(() => {});
+          } catch (e) { /* ignorer */ }
+        }
+      }
     }
-
-    // Si la réponse est bien du JSON, retourne les résultats
-    if (response.data && Array.isArray(response.data)) {
-      return response.data;
-    }
-
-    // Si la structure est différente, essaie de l'extraire
-    if (response.data && response.data.result && Array.isArray(response.data.result.users)) {
-      return response.data.result.users;
-    }
-
-    console.error('Format de réponse inattendu :', response.data);
-    return [];
-  } catch (error) {
-    console.error('Erreur lors de la recherche d\'utilisateurs :', error.message);
-    if (error.response) {
-      console.error('Détails de l\'erreur :', {
-        status: error.response.status,
-        data: error.response.data,
+    
+    // Attendre que la page charge complètement
+    await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 3000)));
+    
+    // Extraire les utilisateurs de la page avec un sélecteur générique pour les profils d'utilisateurs
+    const users = await page.evaluate(() => {
+      const results = [];
+      
+      // Sélectionner tous les profils d'utilisateurs sur la page
+      // Utiliser un sélecteur large pour les cartes de profil
+      const userCards = document.querySelectorAll('div.relative.flex.flex-row, div.cursor-pointer');
+      
+      userCards.forEach(card => {
+        try {
+          // Essayer d'extraire le nom d'utilisateur et le displayName
+          const usernameElement = card.querySelector('div.text-muted, span.text-muted');
+          const displayNameElement = card.querySelector('span.font-semibold, div.font-semibold');
+          
+          // Essayer de trouver le bouton Follow ou un lien vers le profil
+          const profileLink = card.querySelector('a[href^="/"]');
+          
+          if (usernameElement || displayNameElement) {
+            const username = usernameElement ? usernameElement.textContent.trim().replace('@', '') : '';
+            const displayName = displayNameElement ? displayNameElement.textContent.trim() : '';
+            const href = profileLink ? profileLink.getAttribute('href') : '';
+            
+            // Vérifier que c'est bien un profil utilisateur (pas un message)
+            if (username || (href && href.indexOf('/cast/') === -1)) {
+              results.push({
+                username: username,
+                displayName: displayName || username,
+                href: href
+              });
+            }
+          }
+        } catch (e) {
+          // Ignorer les erreurs d'extraction pour cet utilisateur
+        }
       });
-    }
-    throw error;
+      
+      return results;
+    });
+    
+    console.log(`Trouvé ${users.length} utilisateurs potentiels avec le mot-clé "${keyword}"`);
+    return users;
+  } catch (error) {
+    console.error(`Erreur lors de la recherche d'utilisateurs avec le mot-clé "${keyword}" :`, error.message);
+    return [];
   }
 }
 

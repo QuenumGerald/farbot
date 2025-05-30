@@ -1,20 +1,149 @@
 import { getFarcasterPage } from './login.js';
 import fs from 'fs';
 import path from 'path';
+import { searchUsersByKeywords } from './userSearch.js';
 
 class SocialActions {
+  // Utilitaire pour extraire les 10 premiers mots d'un message
+  static getFirst10Words(text) {
+    if (!text) return '';
+    return text.split(/\s+/).slice(0, 10).join(' ').toLowerCase();
+  }
+  
+  // Vérifie si l'auteur a déjà reçu une réponse dans les 15 derniers jours
+  static hasRespondedToAuthorRecently(history, author, daysThreshold = 15) {
+    if (!author || !history) return false;
+    
+    const now = new Date();
+    const authorLower = author.toLowerCase();
+    
+    // Parcourir tous les messages dans l'historique
+    for (const key in history) {
+      const entry = history[key];
+      
+      // Vérifier si l'auteur correspond et si la réponse a été envoyée
+      if (entry.author && entry.author.toLowerCase() === authorLower && entry.responded) {
+        // Vérifier la date (si moins de X jours)
+        const responseDate = new Date(entry.date);
+        const diffTime = Math.abs(now - responseDate);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diffDays < daysThreshold) {
+          return true; // A répondu à cet auteur récemment
+        }
+      }
+    }
+    
+    return false; // Pas de réponse récente à cet auteur
+  }
+
+  // Chemin absolu vers le fichier d'historique des réponses
+  static getHistoryPath() {
+    return path.resolve(process.cwd(), 'reply_history.json');
+  }
+  
+  // Chemin absolu vers le fichier d'historique des suivis
+  static getFollowHistoryPath() {
+    return path.resolve(process.cwd(), 'follow_history.json');
+  }
+
+  // Charge l'historique des réponses (clé = 10 premiers mots)
+  static loadReplyHistory() {
+    const file = SocialActions.getHistoryPath();
+    if (!fs.existsSync(file)) return {};
+    try {
+      const data = fs.readFileSync(file, 'utf8');
+      return JSON.parse(data);
+    } catch (e) {
+      console.error('Erreur lecture historique:', e.message);
+      return {};
+    }
+  }
+
+  // Sauvegarde l'historique des réponses
+  static saveReplyHistory(history) {
+    const file = SocialActions.getHistoryPath();
+    try {
+      fs.writeFileSync(file, JSON.stringify(history, null, 2), 'utf8');
+    } catch (e) {
+      console.error('Erreur sauvegarde historique:', e.message);
+    }
+  }
+  
+  // Charge l'historique des utilisateurs suivis
+  static loadFollowHistory() {
+    const file = SocialActions.getFollowHistoryPath();
+    if (!fs.existsSync(file)) return {};
+    try {
+      const data = fs.readFileSync(file, 'utf8');
+      return JSON.parse(data);
+    } catch (e) {
+      console.error('Erreur lecture historique de follow:', e.message);
+      return {};
+    }
+  }
+  
+  // Sauvegarde l'historique des utilisateurs suivis
+  static saveFollowHistory(history) {
+    const file = SocialActions.getFollowHistoryPath();
+    try {
+      fs.writeFileSync(file, JSON.stringify(history, null, 2), 'utf8');
+    } catch (e) {
+      console.error('Erreur sauvegarde historique de follow:', e.message);
+    }
+  }
+
   constructor() {
     this.page = null;
   }
 
   /**
-   * Initialise la page si ce n'est pas déjà fait
+   * Initialise la page si ce n'est pas déjà fait ou rafraîchit la page existante
+   * @param {boolean} forceRefresh - Force une nouvelle page même si une existe déjà
    */
-  async ensurePage() {
-    if (!this.page) {
-      this.page = await getFarcasterPage();
+  async ensurePage(forceRefresh = false) {
+    try {
+      // Si on force le rafraîchissement ou si la page n'existe pas ou est détachée/fermée
+      let needNewPage = forceRefresh;
+      if (this.page) {
+        // Vérifie si la page est fermée ou détachée (frame detached)
+        try {
+          if (typeof this.page.isClosed === 'function' && this.page.isClosed()) {
+            needNewPage = true;
+          } else if (this.page.mainFrame && typeof this.page.mainFrame === 'function') {
+            const mainFrame = this.page.mainFrame();
+            if (mainFrame && mainFrame._detached) {
+              needNewPage = true;
+            }
+          }
+        } catch (e) {
+          // Si une erreur survient, on préfère recréer la page
+          needNewPage = true;
+        }
+      } else {
+        needNewPage = true;
+      }
+
+      if (needNewPage) {
+        // Fermer l'ancienne page si elle existe
+        if (this.page) {
+          try {
+            await this.page.close().catch(e => console.warn('Erreur fermeture page:', e.message));
+          } catch (e) {
+            console.warn('Erreur fermeture page:', e.message);
+          }
+          this.page = null;
+        }
+        // Créer une nouvelle page (force refresh)
+        this.page = await getFarcasterPage(true);
+      }
+      return this.page;
+    } catch (error) {
+      console.error("Erreur lors de l'initialisation de la page:", error.message);
+      // En cas d'erreur critique, réinitialiser complètement
+      this.page = null;
+      return await getFarcasterPage();
     }
-    return this.page;
   }
 
   /**
@@ -171,128 +300,628 @@ class SocialActions {
    */
   async close() {
     if (this.page) {
-      await this.page.close();
+      try {
+        await this.page.close().catch(e => console.warn('Erreur fermeture page:', e.message));
+      } catch (e) {
+        console.warn('Erreur lors de la fermeture de la page:', e.message);
+      }
       this.page = null;
     }
   }
   
+  /**
+   * Stabilise l'environnement Puppeteer - ferme et réouvre la page
+   * @returns {Promise<import('puppeteer').Page>} La nouvelle page
+   */
+  async stabilize() {
+    console.log('Stabilisation de l\'environnement Puppeteer...');
+    await this.close();
+    // Attendre un peu pour s'assurer que les ressources sont libérées
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    const newPage = await this.ensurePage(true);
+    console.log('Environnement Puppeteer stabilisé');
+    return newPage;
+  }
+
   /**
    * Recherche des messages et y répond directement sur la page de recherche
    * @param {string} keyword - Mot-clé à rechercher
    * @param {string} type - Type de recherche ('users' ou 'recent')
    * @param {Function} generateResponse - Fonction pour générer une réponse (via Gemini)
    * @param {number} maxResponses - Nombre maximum de réponses à envoyer
+   * @param {Array<string>} [replyKeywords] - Liste optionnelle de mots-clés pour filtrer les messages avant de répondre
    * @returns {Promise<number>} - Nombre de réponses envoyées
    */
-  async searchAndReplyInline(keyword, type = 'recent', generateResponse, maxResponses = 3) {
-    // --- Gestion de l'historique des réponses ---
-    const historyPath = path.resolve(process.cwd(), 'reply_history.json');
-    let replyHistory = {};
-    try {
-      if (fs.existsSync(historyPath)) {
-        replyHistory = JSON.parse(fs.readFileSync(historyPath, 'utf-8'));
-      }
-    } catch (err) {
-      console.warn('Impossible de charger reply_history.json:', err.message);
-    }
-
-    const page = await this.ensurePage();
+  async searchAndReplyInline(keyword, type = 'recent', generateResponse, maxResponses = 3, replyKeywords = []) {
+    // Forcer une nouvelle page pour plus de stabilité
+    const page = await this.ensurePage(true);
     let responsesCount = 0;
-    
+    let skippedCount = 0;
+
     try {
       // Utilise l'URL adaptée selon le type de recherche
       const searchUrl = `https://farcaster.xyz/~/search/${type}?q=${encodeURIComponent(keyword)}`;
       console.log(`Recherche en cours sur: ${searchUrl}`);
-      
+
       await page.goto(searchUrl, {
         waitUntil: 'networkidle2',
         timeout: 10000
       });
-      
+
       // Attendre que la page charge complètement
       await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 5000)));
-      
+
       // Trouver tous les messages sur la page de recherche
       console.log('Recherche des messages sur la page...');
       const messageItems = await page.$$('.relative.cursor-pointer.px-4.py-2, div.cursor-pointer:has(div.line-clamp-feed)');
       console.log(`Trouvé ${messageItems.length} messages potentiels`);
-      
-      // Parcourir chaque message et répondre
-      for (let i = 0; i < Math.min(messageItems.length, maxResponses); i++) {
+
+      // Charger l'historique des réponses
+      const replyHistory = SocialActions.loadReplyHistory();
+      // Parcourir chaque message jusqu'à ce qu'on ait envoyé suffisamment de réponses
+      // ou qu'on ait parcouru tous les messages disponibles
+      for (let i = 0; i < messageItems.length && responsesCount < maxResponses; i++) {
         try {
           const messageItem = messageItems[i];
-          let replyButton = null;
+
+          // Extraire le contenu du message pour la réponse
+          const content = await page.evaluate(el => {
+            const textElement = el.querySelector('.line-clamp-feed');
+            return textElement ? textElement.textContent.trim() : '';
+          }, messageItem);
+
+          // Calculer les 10 premiers mots une seule fois pour ce message
+          const first10 = SocialActions.getFirst10Words(content);
+
+          // Extraire l'auteur du message (sélecteur précis pour l'auteur)
+          const author = await page.evaluate(el => {
+            // Essayer plusieurs sélecteurs possibles pour trouver l'auteur
+            const authorElement =
+              el.querySelector('span a.font-semibold') || // Sélecteur spécifique pour les noms d'auteurs
+              el.querySelector('div.font-semibold') ||
+              el.querySelector('a[href^="/"]:not([href*="/~/"])');
+
+            const authorName = authorElement ? authorElement.textContent.trim() : '';
+            return authorName || 'utilisateur_inconnu';
+          }, messageItem);
+
+          if (!content) {
+            console.log('Message sans contenu, passage au suivant');
+            continue;
+          }
+
+          console.log(`Message ${i + 1}/${messageItems.length} par ${author}: ${content.substring(0, 30)}...`);
+
+          // Vérifier si le message contient un des mots-clés de réponse (si spécifiés)
+          if (replyKeywords.length > 0) {
+            const hasReplyKeyword = replyKeywords.some(kw => 
+              content.toLowerCase().includes(kw.toLowerCase())
+            );
+            
+            if (!hasReplyKeyword) {
+              console.log('Aucun mot-clé de réponse trouvé dans le message, passage au suivant');
+              skippedCount++;
+              continue;
+            }
+          }
+
+          // Trouver le bouton de réponse dans ce message en utilisant la structure HTML exacte
+          console.log('Recherche du bouton de réponse avec le sélecteur exact...');
+
+          // Sélecteur EXACT basé sur le HTML fourni par l'utilisateur
+          let replyButton = await messageItem.$('div.group.flex.w-max.flex-row.items-center.text-sm.text-faint.cursor-pointer');
+
+          // Sélecteur alternatif contenant le SVG spécifique du bouton de réponse
+          if (!replyButton) {
+            replyButton = await messageItem.$('div:has(svg path[d^="M1.625 3.09375"][fill="#9FA3AF"])');
+          }
+
+          // Sélecteur alternatif pour le conteneur avec son contenu distinctif
+          if (!replyButton) {
+            replyButton = await messageItem.$('.group.flex:has(svg path[fill="#9FA3AF"])');
+          }
+
+          // Méthode fiable: Sélectionner les boutons d'action et prendre celui qui contient le path spécifique
+          if (!replyButton) {
+            try {
+              // Récupérer tous les boutons avec des SVG
+              const allButtons = await messageItem.$$('div.group.flex');
+              console.log(`Trouvé ${allButtons.length} boutons potentiels`);
+
+              // Vérifier chaque bouton pour trouver celui qui contient le path spécifique
+              for (const button of allButtons) {
+                const hasCommentIcon = await button.evaluate(el => {
+                  // Vérifier si l'élément contient un SVG avec le path spécifique du bouton de commentaire
+                  const svgPath = el.querySelector('svg path');
+                  return svgPath && svgPath.getAttribute('d') &&
+                    svgPath.getAttribute('d').startsWith('M1.625 3.09375');
+                });
+
+                if (hasCommentIcon) {
+                  replyButton = button;
+                  console.log('Bouton de réponse trouvé par l\'icone de commentaire');
+                  break;
+                }
+              }
+            } catch (error) {
+              console.error('Erreur lors de la recherche du bouton de réponse:', error.message);
+            }
+          }
+
+          if (!replyButton) {
+            console.log('Bouton de réponse introuvable après toutes les stratégies, passage au message suivant');
+            continue;
+          }
+
+          console.log('Bouton de réponse trouvé !');
+
+          // Vérifier si on a déjà répondu à ce message (par les 10 premiers mots)
+          if (replyHistory[first10]) {
+            console.log('Déjà répondu à ce message (10 premiers mots identiques), passage au suivant');
+            skippedCount++;
+            continue;
+          }
+          
+          // Vérifier si on a déjà répondu à cet auteur dans les 15 derniers jours
+          if (SocialActions.hasRespondedToAuthorRecently(replyHistory, author)) {
+            console.log(`Déjà répondu à l'auteur "${author}" dans les 15 derniers jours, passage au suivant`);
+            skippedCount++;
+            continue;
+          }
+          
+          // Générer une réponse avec Gemini
+          console.log('Génération d\'une réponse avec Gemini...');
+          const response = await generateResponse(content, author);
+          
+          if (!response) {
+            console.log('Pas de réponse générée, passage au suivant');
+            continue;
+          }
+
+          console.log(`Réponse générée: ${response.substring(0, 30)}...`);
+
+          // Cliquer sur le bouton de réponse
+          console.log('Clic sur le bouton de réponse...');
+          
           try {
-            // Récupérer tous les boutons avec des SVG
+            // Vérifier que le bouton est toujours attaché à la page
+            await replyButton.click();
+          } catch (clickError) {
+            console.error('Erreur lors du clic sur le bouton de réponse:', clickError.message);
+            continue; // Passer au message suivant en cas d'erreur
+          }
+
+          // Attendre l'ouverture de la modale avec un délai plus long
+          await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 5000)));
+
+          // Vérifier si la modale est ouverte
+          const modalVisible = await page.evaluate(() => {
+            return !!document.querySelector('div[role="textbox"], [contenteditable="true"], textarea');
+          });
+          
+          if (!modalVisible) {
+            console.log('La modale de réponse ne s\'est pas ouverte correctement, on passe au message suivant');
+            continue;
+          }
+
+          // Saisir la réponse - utiliser try/catch pour éviter les erreurs de timeout
+          try {
+            await page.waitForSelector('div[role="textbox"], [contenteditable="true"], textarea', { visible: true, timeout: 10000 });
+          } catch (selectorError) {
+            console.error('Erreur lors de l\'attente du champ de texte:', selectorError.message);
+            continue; // Passer au message suivant si le champ de texte n'est pas trouvé
+          }
+          console.log('Saisie de la réponse...');
+          await page.type('div[role="textbox"], [contenteditable="true"], textarea', response);
+
+          // Cliquer sur le bouton d'envoi avec le sélecteur exact fourni par l'utilisateur
+          console.log('Recherche du bouton d\'envoi...');
+
+          // Sélecteur exact du bouton Reply fourni par l'utilisateur
+          const exactSelector = 'button.rounded-lg.font-semibold.border.border-transparent.bg-action-primary.text-light[title="Reply"]';
+
+          // Attendre un peu que le bouton soit vraiment cliquable
+          await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 1000)));
+
+          try {
+            // D'abord, essayer le sélecteur exact
+            let sendButton = await page.$(exactSelector);
+
+            // Si le sélecteur exact ne fonctionne pas, essayer des alternatives
+            if (!sendButton) {
+              sendButton = await page.$('button.rounded-lg.font-semibold[title="Reply"]');
+            }
+
+            if (!sendButton) {
+              sendButton = await page.$('button.bg-action-primary.text-light');
+            }
+
+            // Si aucun sélecteur CSS ne fonctionne, rechercher par texte
+            if (!sendButton) {
+              console.log('Bouton d\'envoi introuvable par sélecteur, recherche par texte');
+              const buttons = await page.$$('button');
+
+              for (const btn of buttons) {
+                const text = await page.evaluate(el => el.textContent?.trim(), btn);
+                if (text === 'Reply') {
+                  sendButton = btn;
+                  console.log('Bouton Reply trouvé par texte');
+                  break;
+                }
+              }
+            }
+
+            if (!sendButton) {
+              // Si le bouton n'est toujours pas trouvé, utiliser un clic JavaScript directement
+              console.log('Essai de clic JavaScript direct sur le bouton Reply...');
+              await page.evaluate(() => {
+                const buttons = Array.from(document.querySelectorAll('button'));
+                const replyButton = buttons.find(btn => btn.textContent?.trim() === 'Reply');
+                if (replyButton) {
+                  replyButton.click();
+                  return true;
+                }
+                return false;
+              });
+            } else {
+              // Si le bouton est trouvé, utiliser plusieurs méthodes de clic pour s'assurer qu'il fonctionne
+              console.log('Bouton d\'envoi trouvé, tentative de clic multiple...');
+
+              // Méthode 1: Clic standard via Puppeteer
+              await sendButton.click();
+
+              // Méthode 2: Clic via JavaScript evaluate
+              await page.evaluate(element => {
+                element.click();
+              }, sendButton);
+
+              // Méthode 3: Clic via event dispatch
+              await page.evaluate(element => {
+                const event = new MouseEvent('click', {
+                  bubbles: true,
+                  cancelable: true,
+                  view: window
+                });
+                element.dispatchEvent(event);
+              }, sendButton);
+            }
+
+          } catch (error) {
+            console.error('Erreur lors du clic sur le bouton d\'envoi:', error.message);
+            // Essayer de fermer la modale en appuyant sur Escape
+            await page.keyboard.press('Escape');
+            await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 2000)));
+            continue;
+          }
+
+          // Attendre la confirmation d'envoi
+          await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 3000)));
+          console.log('Réponse envoyée avec succès!');
+          responsesCount++;
+
+          // Enregistrer dans l'historique que ce message a reçu une réponse
+          replyHistory[first10] = {
+            author,
+            date: new Date().toISOString(),
+            responded: true
+          };
+          SocialActions.saveReplyHistory(replyHistory);
+
+          // Attendre un peu avant de passer au message suivant pour éviter rate limits
+          await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 5000)));
+
+        } catch (error) {
+          console.error(`Erreur lors du traitement du message ${i + 1}:`, error);
+          // Continuer avec le prochain message
+          await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 3000)));
+        }
+      }
+
+      console.log(`Traitement terminé. Résultats: ${responsesCount} réponses envoyées, ${skippedCount} messages ignorés (déjà répondus ou auteur récent).`);
+      // Note: On n'a pas atteint le nombre max de réponses si on a parcouru tous les messages
+      if (responsesCount < maxResponses && messageItems.length > 0) {
+        console.log(`Note: Nombre maximum de réponses (${maxResponses}) non atteint. Tous les messages restants ont déjà reçu une réponse ou ne possèdent pas de bouton de réponse.`);
+      }
+      return responsesCount;
+
+    } catch (error) {
+      console.error('Erreur lors de la recherche et réponse aux messages:', error);
+      return responsesCount;
+    }
+  }
+
+  /**
+   * Recherche des utilisateurs par mot-clé et les suit automatiquement
+   * @returns {Promise<number>} - Nombre d'utilisateurs suivis
+   */
+  async searchAndFollowUsers() {
+    let followCount = 0;
+    const maxFollows = 10; // Nombre maximum d'utilisateurs à suivre par session
+    let page = null;
+    
+    // Importer la configuration pour accéder aux mots-clés
+    const { cryptoKeywords } = (await import('../config/index.js')).default;
+    
+    // Sélectionner un mot-clé aléatoire
+    const keyword = cryptoKeywords[Math.floor(Math.random() * cryptoKeywords.length)];
+    console.log(`Recherche d'utilisateurs avec le mot-clé: ${keyword}`);
+    
+    // Charger l'historique des follows
+    const followHistory = SocialActions.loadFollowHistory();
+    
+    try {
+      
+      // Utiliser la page existante ou en créer une nouvelle si nécessaire
+      page = await this.ensurePage(false);  // false = ne pas forcer la création d'une nouvelle page
+      
+      // Rechercher des utilisateurs
+      let users = [];
+      try {
+        users = await searchUsersByKeywords(keyword);
+        console.log(`Trouvé ${users.length} utilisateurs potentiels avec le mot-clé "${keyword}"`);
+      } catch (searchError) {
+        console.error(`Erreur lors de la recherche d'utilisateurs:`, searchError.message);
+        // Si une erreur se produit pendant la recherche, vérifier si la page est toujours valide
+        try {
+          // Tenter une navigation simple pour vérifier si la page est valide
+          await page.goto('https://farcaster.xyz/', { waitUntil: 'networkidle2', timeout: 15000 });
+        } catch (pageError) {
+          console.error('Page non valide, réinitialisation nécessaire');
+          // Réinitialiser la page complètement
+          page = await this.ensurePage(true); // Forcer la création d'une nouvelle page
+          return followCount;
+        }
+      }
+      
+      // Si aucun utilisateur trouvé, terminer
+      if (users.length === 0) {
+        return followCount;
+      }
+      
+      // Parcourir les utilisateurs trouvés jusqu'à atteindre le nombre maximum de follows
+      for (const user of users) {
+        if (followCount >= maxFollows) {
+          console.log(`Nombre maximum de follows atteint (${maxFollows}).`);
+          break;
+        }
+        
+        const username = user.username || user.displayName || '';
+        
+        if (!username) {
+          console.log('Utilisateur sans nom d\'utilisateur, on passe au suivant');
+          continue;
+        }
+        
+        const userKey = username.toLowerCase();
+        const daysThreshold = 30; // Ne pas refollow avant 30 jours
+        
+        // Vérifier si déjà suivi récemment
+        if (followHistory[userKey]) {
+          const followDate = new Date(followHistory[userKey].date);
+          const now = new Date();
+          const diffTime = Math.abs(now - followDate);
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          
+          if (diffDays < daysThreshold) {
+            console.log(`Déjà suivi ${username} dans les ${daysThreshold} derniers jours, on passe au suivant`);
+            continue;
+          }
+        }
+        
+        // Essayer de naviguer vers le profil avec plusieurs tentatives
+        const profileUrl = `https://farcaster.xyz/${username}`;
+        console.log(`Navigation vers le profil: ${profileUrl}`);
+        
+        // Tenter de naviguer avec réessais
+        const navigationSuccess = await this.navigateWithRetries(profileUrl);
+        if (!navigationSuccess) {
+          console.log(`Échec de la navigation vers le profil de ${username} après plusieurs tentatives`);
+          continue;
+        }
+        
+        // Attendre le chargement complet
+        try {
+          await page.waitForSelector('button:has-text("Follow"), button:has-text("Following")', { timeout: 10000 });
+        } catch (error) {
+          console.error('Impossible de trouver le bouton Follow sur le profil:', error.message);
+          continue;
+        }
+        
+        // Vérifier si on suit déjà l'utilisateur
+        const isFollowing = await page.evaluate(() => {
+          const followButton = Array.from(document.querySelectorAll('button'))
+            .find(btn => btn.textContent.trim() === 'Following');
+          return !!followButton;
+        });
+        
+        if (isFollowing) {
+          console.log(`On suit déjà ${username}, on passe au suivant`);
+          // Mettre à jour la date du follow dans l'historique
+          followHistory[userKey] = { date: new Date().toISOString() };
+          continue;
+        }
+        
+        // Essayer de cliquer sur le bouton Follow
+        try {
+          await page.click('button:has-text("Follow")');
+          console.log(`Suivi de l'utilisateur ${username} réussi !`);
+          followCount++;
+          
+          // Mettre à jour l'historique des follows
+          followHistory[userKey] = { date: new Date().toISOString() };
+          
+          // Sauvegarder l'historique après chaque follow réussi
+          SocialActions.saveFollowHistory(followHistory);
+          
+          // Attendre un peu avant de passer à l'utilisateur suivant
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+        } catch (error) {
+          console.error(`Erreur lors du suivi de ${username}:`, error.message);
+        }
+      }
+      
+      // Retourner le nombre d'utilisateurs suivis avec succès
+      return followCount;
+      
+    } catch (error) {
+      console.error('Erreur lors de la recherche et follow d\'utilisateurs:', error);
+      return followCount;
+    }
+  }
+
+  /**
+   * Parcourt le fil d'accueil (home) Farcaster et répond automatiquement aux messages pertinents.
+   * @param {Function} generateResponse - Fonction pour générer une réponse (via Gemini)
+   * @param {number} maxResponses - Nombre maximum de réponses à envoyer
+   * @param {Array<string>} [replyKeywords] - Liste optionnelle de mots-clés pour filtrer les messages avant de répondre
+   * @returns {Promise<number>} - Nombre de réponses envoyées
+   */
+  async replyOnHomeTimeline(generateResponse, maxResponses = 3, replyKeywords = []) {
+    const page = await this.ensurePage(true);
+    let responsesCount = 0;
+    let skippedCount = 0;
+
+    try {
+    // Aller sur le fil d'accueil Farcaster
+    const homeUrl = 'https://farcaster.xyz/';
+    console.log(`Navigation vers le fil d'accueil: ${homeUrl}`);
+    await page.goto(homeUrl, { waitUntil: 'networkidle2', timeout: 15000 });
+    await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 5000)));
+
+    // Sélecteur pour trouver tous les messages sur le fil d'accueil
+    const messageItems = await page.$$('.relative.cursor-pointer.px-4.py-2, div.cursor-pointer:has(div.line-clamp-feed)');
+    console.log(`Trouvé ${messageItems.length} messages potentiels sur le fil d'accueil`);
+
+    // Charger l'historique des réponses
+    const replyHistory = SocialActions.loadReplyHistory();
+    for (let i = 0; i < messageItems.length && responsesCount < maxResponses; i++) {
+      try {
+        const messageItem = messageItems[i];
+        // Extraire le contenu du message
+        const content = await page.evaluate(el => {
+          const textElement = el.querySelector('.line-clamp-feed');
+          return textElement ? textElement.textContent.trim() : '';
+        }, messageItem);
+        // Calculer les 10 premiers mots
+        const first10 = SocialActions.getFirst10Words(content);
+        // Extraire l'auteur
+        const author = await page.evaluate(el => {
+          const authorElement =
+            el.querySelector('span a.font-semibold') ||
+            el.querySelector('div.font-semibold') ||
+            el.querySelector('a[href^="/"]:not([href*="/~/"])');
+          const authorName = authorElement ? authorElement.textContent.trim() : '';
+          return authorName || 'utilisateur_inconnu';
+        }, messageItem);
+        if (!content) {
+          console.log('Message sans contenu, passage au suivant');
+          continue;
+        }
+        console.log(`Message ${i + 1}/${messageItems.length} par ${author}: ${content.substring(0, 30)}...`);
+        // Filtrage par mots-clés
+        if (replyKeywords.length > 0) {
+          const hasReplyKeyword = replyKeywords.some(kw => content.toLowerCase().includes(kw.toLowerCase()));
+          if (!hasReplyKeyword) {
+            console.log('Aucun mot-clé de réponse trouvé dans le message, passage au suivant');
+            skippedCount++;
+            continue;
+          }
+        }
+        // Vérifier historique
+        if (replyHistory[first10]) {
+          console.log('Déjà répondu à ce message (10 premiers mots identiques), passage au suivant');
+          skippedCount++;
+          continue;
+        }
+        if (SocialActions.hasRespondedToAuthorRecently(replyHistory, author)) {
+          console.log(`Déjà répondu à l'auteur "${author}" récemment, passage au suivant`);
+          skippedCount++;
+          continue;
+        }
+        // Générer une réponse
+        console.log('Génération d\'une réponse avec Gemini...');
+        const response = await generateResponse(content, author);
+        if (!response) {
+          console.log('Pas de réponse générée, passage au suivant');
+          continue;
+        }
+        // Cliquer sur le bouton de réponse
+        let replyButton = await messageItem.$('div.group.flex.w-max.flex-row.items-center.text-sm.text-faint.cursor-pointer');
+        if (!replyButton) {
+          replyButton = await messageItem.$('div:has(svg path[d^="M1.625 3.09375"][fill="#9FA3AF"])');
+        }
+        if (!replyButton) {
+          replyButton = await messageItem.$('.group.flex:has(svg path[fill="#9FA3AF"])');
+        }
+        if (!replyButton) {
+          try {
             const allButtons = await messageItem.$$('div.group.flex');
-            console.log(`Trouvé ${allButtons.length} boutons potentiels`);
-            // Vérifier chaque bouton pour trouver celui qui contient le path spécifique
             for (const button of allButtons) {
               const hasCommentIcon = await button.evaluate(el => {
-                // Vérifier si l'élément contient un SVG avec le path spécifique du bouton de commentaire
                 const svgPath = el.querySelector('svg path');
-                return svgPath && svgPath.getAttribute('d') && 
-                       svgPath.getAttribute('d').startsWith('M1.625 3.09375');
+                return svgPath && svgPath.getAttribute('d') && svgPath.getAttribute('d').startsWith('M1.625 3.09375');
               });
-
               if (hasCommentIcon) {
                 replyButton = button;
-                console.log('Bouton de réponse trouvé par l\'icone de commentaire');
-
-        console.log(`Réponse générée: ${response.substring(0, 30)}...`);
-
-        // Cliquer sur le bouton de réponse
-        console.log('Clic sur le bouton de réponse...');
-        await replyButton.click();
-
-        // Attendre l'ouverture de la modale
-        await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 3000)));
-
-        // Saisir la réponse
-        await page.waitForSelector('div[role="textbox"], [contenteditable="true"], textarea', { visible: true, timeout: 10000 });
+                break;
+              }
+            }
+          } catch (error) {
+            console.error('Erreur lors de la recherche du bouton de réponse:', error.message);
+          }
+        }
+        if (!replyButton) {
+          console.log('Bouton de réponse introuvable après toutes les stratégies, passage au message suivant');
+          continue;
+        }
+        console.log('Bouton de réponse trouvé !');
+        // Clic sur le bouton de réponse
+        try {
+          await replyButton.click();
+        } catch (clickError) {
+          console.error('Erreur lors du clic sur le bouton de réponse:', clickError.message);
+          continue;
+        }
+        await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 5000)));
+        // Vérifier si la modale est ouverte
+        const modalVisible = await page.evaluate(() => {
+          return !!document.querySelector('div[role="textbox"], [contenteditable="true"], textarea');
+        });
+        if (!modalVisible) {
+          console.log('La modale de réponse ne s\'est pas ouverte correctement, on passe au message suivant');
+          continue;
+        }
+        try {
+          await page.waitForSelector('div[role="textbox"], [contenteditable="true"], textarea', { visible: true, timeout: 10000 });
+        } catch (selectorError) {
+          console.error('Erreur lors de l\'attente du champ de texte:', selectorError.message);
+          continue;
+        }
         console.log('Saisie de la réponse...');
         await page.type('div[role="textbox"], [contenteditable="true"], textarea', response);
-
-        // Cliquer sur le bouton d'envoi avec le sélecteur exact fourni par l'utilisateur
-        console.log('Recherche du bouton d\'envoi...');
-
-        // Sélecteur exact du bouton Reply fourni par l'utilisateur
+        // Cliquer sur le bouton d'envoi
         const exactSelector = 'button.rounded-lg.font-semibold.border.border-transparent.bg-action-primary.text-light[title="Reply"]';
-
-        // Attendre un peu que le bouton soit vraiment cliquable
         await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 1000)));
-
         try {
-          // D'abord, essayer le sélecteur exact
           let sendButton = await page.$(exactSelector);
-
-          // Si le sélecteur exact ne fonctionne pas, essayer des alternatives
           if (!sendButton) {
             sendButton = await page.$('button.rounded-lg.font-semibold[title="Reply"]');
           }
-
           if (!sendButton) {
             sendButton = await page.$('button.bg-action-primary.text-light');
           }
-
-          // Si aucun sélecteur CSS ne fonctionne, rechercher par texte
           if (!sendButton) {
-            console.log('Bouton d\'envoi introuvable par sélecteur, recherche par texte');
             const buttons = await page.$$('button');
-
             for (const btn of buttons) {
               const text = await page.evaluate(el => el.textContent?.trim(), btn);
               if (text === 'Reply') {
                 sendButton = btn;
-                console.log('Bouton Reply trouvé par texte');
                 break;
               }
             }
           }
-
           if (!sendButton) {
-            // Si le bouton n'est toujours pas trouvé, utiliser un clic JavaScript directement
-            console.log('Essai de clic JavaScript direct sur le bouton Reply...');
             await page.evaluate(() => {
               const buttons = Array.from(document.querySelectorAll('button'));
               const replyButton = buttons.find(btn => btn.textContent?.trim() === 'Reply');
@@ -303,43 +932,62 @@ class SocialActions {
               return false;
             });
           } else {
-            // Si le bouton est trouvé, utiliser plusieurs méthodes de clic pour s'assurer qu'il fonctionne
-            console.log('Bouton d\'envoi trouvé, tentative de clic multiple...');
-
-            // Méthode 1: Clic standard via Puppeteer
             await sendButton.click();
-
-            // Méthode 2: Clic via JavaScript evaluate
+            await page.evaluate(element => { element.click(); }, sendButton);
             await page.evaluate(element => {
-              element.click();
-            }, sendButton);
-
-            // Méthode 3: Clic via event dispatch
-            await page.evaluate(element => {
-              const event = new MouseEvent('click', {
-                bubbles: true,
-                cancelable: true,
-                view: window
-              });
+              const event = new MouseEvent('click', { bubbles: true, cancelable: true, view: window });
               element.dispatchEvent(event);
             }, sendButton);
           }
         } catch (error) {
           console.error('Erreur lors du clic sur le bouton d\'envoi:', error.message);
-          // Essayer de fermer la modale en appuyant sur Escape
           await page.keyboard.press('Escape');
           await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 2000)));
           continue;
         }
-
+        await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 3000)));
+        console.log('Réponse envoyée avec succès!');
         responsesCount++;
+        // Enregistrer dans l'historique
+        replyHistory[first10] = {
+          author,
+          date: new Date().toISOString(),
+          responded: true
+        };
+        SocialActions.saveReplyHistory(replyHistory);
+        await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 5000)));
       } catch (error) {
-        console.error('Erreur lors de la réponse à un message:', error.message);
+        console.error(`Erreur lors du traitement du message ${i + 1}:`, error);
+        await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 3000)));
       }
+    }
+    console.log(`Traitement terminé. Résultats: ${responsesCount} réponses envoyées, ${skippedCount} messages ignorés.`);
+    // Health check : vérifier que la page n'est pas blanche
+    try {
+      const page = await this.ensurePage();
+      // Vérifie qu'un élément clé du DOM Farcaster est présent (ex: sidebar, feed, nav, header)
+      const isHealthy = await page.evaluate(() => !!document.querySelector('.bg-sidebar, .line-clamp-feed, nav, header'));
+      if (!isHealthy) {
+        console.warn('Page blanche détectée, tentative de reload...');
+        try {
+          await page.reload({ waitUntil: 'networkidle2', timeout: 15000 });
+        } catch (reloadErr) {
+          console.warn('Reload échoué, recréation de la page Puppeteer...');
+          try { await page.close(); } catch {}
+          this.page = await getFarcasterPage();
+        }
+      }
+    } catch (healthErr) {
+      console.warn('Erreur lors du health check, tentative de recréation de la page...');
+      try { if (this.page) await this.page.close(); } catch {}
+      this.page = await getFarcasterPage();
     }
     return responsesCount;
   } catch (error) {
-    console.error('Erreur lors de la recherche et réponse aux messages:', error);
+    console.error('Erreur lors du parcours du fil d\'accueil et des réponses:', error);
     return responsesCount;
+    }
   }
-} 
+}
+
+export default new SocialActions();

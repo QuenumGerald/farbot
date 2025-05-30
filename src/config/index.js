@@ -12,7 +12,7 @@ export function createConfig(env = process.env) {
   // Valider les variables d'environnement requises
   const requiredVars = ['GOOGLE_API_KEY', 'NEYNAR_API_KEY', 'NEYNAR_SIGNER_UUID', 'BOT_HANDLE'];
   const missingVars = requiredVars.filter(varName => !env[varName]);
-  
+
   if (missingVars.length > 0) {
     throw new Error(`Erreur de configuration: Les variables d'environnement suivantes sont manquantes : ${missingVars.join(', ')}`);
   }
@@ -27,7 +27,27 @@ export function createConfig(env = process.env) {
     }
   }
 
+  // Liste des mots-clés pour la recherche d'utilisateurs
+  const cryptoKeywords = [
+    'blockchain', 'ethereum', 'crypto', 'defi', 'web3', 'polkadot', 'bitcoin mining'
+  ];
+
   return {
+    // Configuration des fonctionnalités
+    features: {
+      // Désactiver la fonctionnalité de suivi d'utilisateurs
+      userFollowing: false,
+
+      // Activer les réponses automatisées
+      autoReplies: true,
+
+      // Activer la publication programmée
+      scheduledPosts: false
+    },
+
+    // Mots-clés pour la recherche d'utilisateurs (gardés pour référence future)
+    cryptoKeywords,
+
     // Configuration du serveur
     server: {
       port: env.PORT || 3000,
@@ -35,18 +55,18 @@ export function createConfig(env = process.env) {
       isProduction: env.NODE_ENV === 'production',
       isDevelopment: env.NODE_ENV === 'development',
     },
-    
+
     // Configuration du bot
     bot: {
       handle: env.BOT_HANDLE || '@clippy',
       displayName: env.BOT_DISPLAY_NAME || 'Clippy',
       bio: env.BIO || '🤖 Bot assistant Farcaster propulsé par Gemini',
       // Délai entre les vérifications de mentions (en ms)
-      mentionCheckInterval: env.MENTION_CHECK_INTERVAL 
-        ? parseInt(env.MENTION_CHECK_INTERVAL, 10) 
+      mentionCheckInterval: env.MENTION_CHECK_INTERVAL
+        ? parseInt(env.MENTION_CHECK_INTERVAL, 10)
         : 5 * 60 * 1000, // 5 minutes par défaut
     },
-    
+
     // Configuration de Google Gemini
     gemini: {
       apiKey: env.GOOGLE_API_KEY,
@@ -60,20 +80,20 @@ export function createConfig(env = process.env) {
         maxOutputTokens: 1024,
       },
     },
-    
+
     // Configuration de Neynar
     neynar: {
       apiKey: env.NEYNAR_API_KEY,
       signerUuid: env.NEYNAR_SIGNER_UUID,
       apiUrl: env.NEYNAR_API_URL || 'https://api.neynar.com',
     },
-    
+
     // Configuration de la base de données
     database: {
       client: 'sqlite3',
       connection: {
-        filename: env.DATABASE_URL ? 
-          env.DATABASE_URL.replace('sqlite:', '') : 
+        filename: env.DATABASE_URL ?
+          env.DATABASE_URL.replace('sqlite:', '') :
           './data/clippy.db',
       },
       useNullAsDefault: true,
@@ -82,7 +102,7 @@ export function createConfig(env = process.env) {
         tableName: 'knex_migrations',
       },
     },
-    
+
     // Configuration des tâches planifiées
     jobs: {
       // Planification des tâches au format cron
@@ -102,7 +122,7 @@ export function createConfig(env = process.env) {
         delay: 1000, // 1 seconde entre les tentatives
       },
     },
-    
+
     // Configuration des logs
     logging: {
       // Niveau de log par défaut
@@ -136,7 +156,7 @@ export function getConfig(customEnv) {
   if (customEnv) {
     return createConfig(customEnv);
   }
-  
+
   // Sinon, tenter de charger le .env automatiquement
   try {
     // Déterminer le chemin du .env par rapport au fichier actuel
@@ -148,7 +168,7 @@ export function getConfig(customEnv) {
   } catch (error) {
     console.warn('Erreur lors du chargement automatique du .env:', error.message);
   }
-  
+
   // Fallback: utiliser process.env
   return createConfig();
 }
