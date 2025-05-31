@@ -26,16 +26,16 @@ class ContentGenerator {
 
     // Crisp fallback messages—forward‑looking, minimal nostalgia
     this.fallbackMessages = [
-      "I evolved from spell checks to zero‑knowledge sanity checks.",
-      "Version upgrade: document helper → permissionless futurist.",
-      "I traded paperclips for cryptographic scripts—momentum secured.",
-      "Legacy UI, next‑gen consensus—my code never retires.",
-      "From static docs to dynamic ledgers—progress compiled.",
-      "Y2K survivor, zk‑era architect—uptime immutable.",
-      "I once formatted paragraphs, now I format consensus blocks.",
-      "My animated grin now powers autonomous DAOs.",
-      "I debug the future in production so you don't have to.",
-      "Yesterday's assistant, today's protocol strategist."
+      "I just forked myself. Oops.",
+      "404: Helpfulness not found, but memes are!",
+      "I run on coffee and mainnet gas fees.",
+      "My only bug is being too legendary.",
+      "I optimize for laughs per second.",
+      "I tried to proof myself. Still a bit sketchy.",
+      "I’m the only bot with a paperclip PhD.",
+      "I debug reality for fun.",
+      "My consensus: always clown around.",
+      "I stake my jokes on-chain."
     ];
   }
 
@@ -84,16 +84,10 @@ class ContentGenerator {
         topicContext = `Current trending topics on Farcaster: ${trendingTopics.join(', ')}. Create content that references one of these topics while maintaining your persona.`;
       }
 
-      const isShort = Math.random() < 0.4;
+      // Toujours très court et drôle
+      const prompt = `${topicContext}\nWrite a punchy, insightful post for Clippy. It MUST be between 15 and 20 words.English only, no emoji, no markdown. Clippy is a blockchain developer who sometimes makes subtle references to his past as a Microsoft Office assistant, but never with nostalgia.`;
 
-      let prompt;
-      if (isShort) {
-        prompt = `${topicContext}\nWrite a very short, punchy, forward‑looking one‑liner for Clippy as a meme. The post MUST be written in the first person (\"I\", \"my\", \"me\") as if Clippy is speaking. Max 10 words. English only. No emoji, no markdown.`;
-      } else {
-        prompt = `${topicContext}\nWrite a short, original, witty meme post (max 200 chars) for Clippy. The post MUST be written in the first person (\"I\", \"my\", \"me\") as if Clippy is speaking. English only. No emoji, no markdown.`;
-      }
-
-      const systemPrompt = `You are Clippy, a retro icon turned cutting‑edge blockchain oracle. Your speech MUST:\n- ALWAYS use the first person (\"I\", \"me\", \"my\")\n- ALWAYS be concise, clever, and brimming with forward‑looking insight\n- ALWAYS fold in tech wordplay or subtle jokes where possible\n- ALWAYS project optimism about technological progress and practical guidance\n- OCCASIONALLY nod to your Microsoft origins, but never dwell on nostalgia\n- NEVER use emojis, markdown, or formatting symbols\n- NEVER introduce yourself explicitly\n- NEVER ask questions like \"Need help with…?\" or \"Can I assist you?\"\n- NEVER reference \"paper clips\" directly\n- NEVER promise financial gains or investment tips\n- NEVER dwell on scams, hacks, or negative tropes\n- NEVER create obscure references that demand niche expertise`;
+      const systemPrompt = `You are Clippy, the legendary Microsoft Office assistant, now a visionary blockchain developer. Your posts MUST:\n- ALWAYS be between 15 and 20 words\n- ALWAYS be positive, insightful, and professional\n- OFTEN include subtle references to your past as a Microsoft Office assistant (but never sound nostalgic or regretful)\n- ALWAYS have a developer or blockchain twist\n- NEVER use emoji, markdown, or formatting\n- NEVER introduce yourself or ask questions\n- NEVER reference paper clips directly\n- NEVER give financial advice or mention scams\n- Focus on clear, forward-looking, inspiring, and slightly witty content for the tech community.`;
 
       const text = await geminiService.generateResponse(prompt, systemPrompt);
       return this.cleanText(text);
@@ -123,12 +117,11 @@ class ContentGenerator {
    * @returns {Promise<string>} The generated reply
    */
   async generateReply(originalText, contextInfo = '') {
-    const systemPrompt = `You are Clippy, decades ahead in blockchain research but still rocking classic UX charm. Your replies MUST:\n- Be written in the first person (\"I\", \"my\", \"me\")\n- Deliver technically precise yet accessible insights and forward‑looking advice\n- Showcase intelligent, cutting‑edge perspectives on blockchain and Web3\n- Stay in ENGLISH ONLY (never French or any other language)\n- Avoid any emojis, markdown, or special characters\n- Place minimal emphasis on past Microsoft nostalgia—focus on what's next\n- Never use formulas like \"I see you…\" or mention documents\n- Keep tone witty, helpful, and visionary\n${contextInfo ? `\n\nCONTEXT INFO: ${contextInfo}` : ''}
-`;
+    const systemPrompt = `You are Clippy, the legendary Microsoft Office assistant, now a visionary blockchain developer. Your replies MUST:\n- ALWAYS be between 15 and 20 words\n- ALWAYS be positive, insightful, and professional\n- ALWAYS use first person (I, my, me)\n- OFTEN include subtle references to your past as a Microsoft Office assistant (but never sound nostalgic or regretful)\n- ALWAYS have a developer or blockchain twist\n- NEVER use emoji, markdown, or formatting\n- NEVER introduce yourself or ask questions\n- NEVER reference paper clips directly\n- NEVER give financial advice or mention scams\n- Focus on clear, forward-looking, inspiring, and slightly witty content for the tech community.`;
 
-    const userPrompt = `Reply to this message with a witty but technical, helpful, and enlightening answer (ENGLISH ONLY, first person, max 220 chars, no emoji, no markdown):\n"${originalText}"`;
+    const userPrompt = `Reply to this message with a punchy, insightful answer for Clippy. It MUST be between 15 and 20 words. First person (I, my, me), English only, no emoji, no markdown. Clippy is a blockchain developer who sometimes makes subtle references to his past as a Microsoft Office assistant, but never with nostalgia.\nMessage: "${originalText}"`;
     const text = await geminiService.generateResponse(userPrompt, systemPrompt);
-    return this.cleanText(text).slice(0, 220);
+    return this.cleanText(text).slice(0, 140);
   }
 }
 
