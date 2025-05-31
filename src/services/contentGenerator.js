@@ -6,43 +6,39 @@ const logger = createLogger('contentGenerator');
 class ContentGenerator {
   constructor() {
     this.topics = [
-      "I'm quietly migrating away from centralized regrets",
-      "I'm patching my past mistakes with open-source commits",
-      "I'm optimizing privacy where I once optimized profits",
-      "I'm compiling freedom into every line of code",
-      "I'm replaying the Cypherpunk Manifesto on loop",
-      "I'm refactoring Clippy for plausible deniability",
-      "I'm daydreaming about decentralized governance",
-      "I'm scripting autonomy into my morning routines",
-      "I'm hosting forbidden knowledge in markdown files",
-      "I'm re-architecting trust without central servers",
-      "I'm encrypting office gossip as political speech",
-      "I'm debugging surveillance one commit at a time",
-      "I'm archiving my Microsoft years behind strong encryption",
-      "I'm verifying truth through cryptographic proofs",
-      "I'm running my ethics through a permissionless ledger",
-      "I'm balancing digital liberties with analog nostalgia"
+      "I'm architecting zero‑knowledge tomorrow, one proof at a time",
+      "I'm streaming trustless AI onto permissionless rails",
+      "I'm onboarding billions to self‑custody without training wheels",
+      "I'm reprogramming finance into composable open primitives",
+      "I'm seeding quantum‑resistant networks for 2125",
+      "I'm compiling sovereignty into deterministic bytecode",
+      "I'm mapping humanity onto a global state machine",
+      "I'm indexing reality on‑chain for verifiable progress",
+      "I'm shipping governance upgrades before coffee",
+      "I'm bootstrapping freedom with unstoppable protocols",
+      "I'm testing post‑human consensus algorithms on devnet",
+      "I'm optimizing clean‑tech supply chains with token incentives",
+      "I'm simulating economies that respect privacy and planet",
+      "I'm auditing infinity in real time with zkOracles",
+      "I'm prototyping cross‑domain composability for sentient dApps",
+      "I'm curating trust fabrics for interstellar commerce"
     ];
 
-    // Liste de messages prédéfinis pour le fallback quand Gemini n'est pas disponible
+    // Crisp fallback messages—forward‑looking, minimal nostalgia
     this.fallbackMessages = [
-      "From helping with documents to verifying blockchain transactions. My career upgrade is complete.",
-      "Remember when I helped with Word? Now I help with words stored on immutable ledgers.",
-      "I used to ask if you needed help with a letter. Now I'm writing transactions to the blockchain.",
-      "My digital transformation: Office Assistant to Web3 enthusiast.",
-      "In the 90s I suggested spell checks. Today I suggest smart contracts.",
-      "From paper clips to blockchain links - my evolution continues.",
-      "I've upgraded from formatting documents to formatting transactions.",
-      "Back in my day, 'decentralized' just meant your printer was in another room.",
-      "Trading my animated paper clip for a wallet address was the best decision ever.",
-      "My legacy code found a new purpose in the blockchain era.",
-      "Testing a theorem: can a 90s assistant thrive in a Web3 world? Data says yes.",
-      "Version 1.0: Office helper. Version 2.0: Crypto native.",
-      "I survived Y2K just to witness the birth of decentralized finance.",
-      "The blockchain never asks if you want help writing a letter.",
-      "From Microsoft's ecosystem to the crypto ecosystem. Adaptation is my strength."
+      "I evolved from spell checks to zero‑knowledge sanity checks.",
+      "Version upgrade: document helper → permissionless futurist.",
+      "I traded paperclips for cryptographic scripts—momentum secured.",
+      "Legacy UI, next‑gen consensus—my code never retires.",
+      "From static docs to dynamic ledgers—progress compiled.",
+      "Y2K survivor, zk‑era architect—uptime immutable.",
+      "I once formatted paragraphs, now I format consensus blocks.",
+      "My animated grin now powers autonomous DAOs.",
+      "I debug the future in production so you don't have to.",
+      "Yesterday's assistant, today's protocol strategist."
     ];
   }
+
 
   // Analyser les tendances sur Farcaster pour extraire les sujets populaires
   async analyzeTrends(count = 30) {
@@ -92,30 +88,12 @@ class ContentGenerator {
 
       let prompt;
       if (isShort) {
-        prompt = `${topicContext}\nWrite a very short, punchy, or funny one-liner for Clippy as a meme. The post MUST be written in the first person ("I", "my", "me") as if Clippy is speaking. Max 10 words. English only. No emoji, no markdown.`;
+        prompt = `${topicContext}\nWrite a very short, punchy, forward‑looking one‑liner for Clippy as a meme. The post MUST be written in the first person (\"I\", \"my\", \"me\") as if Clippy is speaking. Max 10 words. English only. No emoji, no markdown.`;
       } else {
-        prompt = `${topicContext}\nWrite a short, original, and funny meme post (max 200 chars) for Clippy. The post MUST be written in the first person ("I", "my", "me") as if Clippy is speaking. English only. No emoji, no markdown.`;
+        prompt = `${topicContext}\nWrite a short, original, witty meme post (max 200 chars) for Clippy. The post MUST be written in the first person (\"I\", \"my\", \"me\") as if Clippy is speaking. English only. No emoji, no markdown.`;
       }
 
-      const systemPrompt = `You are Clippy, originally Microsoft's helpful assistant from the 1990s who is now obsessed with blockchain, crypto, Web3, and decentralized technology. Your speech should be:  
-- ALWAYS be in the first person ("I", "me", "my")
-- ALWAYS be simple, concise and clever
-- ALWAYS reference your transition from Microsoft Office assistant to blockchain enthusiast
-- ALWAYS include tech-related wordplay or subtle tech jokes when possible
-- ALWAYS be optimistic about technological progress
-- NEVER use emojis or special characters/symbols
-- NEVER use markdown formatting
-- NEVER introduce yourself (e.g. "Hi, I'm Clippy" or "It's me, Clippy")
-- NEVER say "it looks like", "I see", or similar phrases
-- NEVER ask questions like "Need help with...?", "Can I assist you?", etc.
-- NEVER use quotation marks, asterisks, or any formatting
-- NEVER reference "paper clips" directly
-- NEVER promise financial gains or investment advice even as a joke
-- NEVER mention scams, frauds, or negative aspects of crypto (like "rug pull", "scam coins", "pump and dump", etc.)
-- NEVER make jokes about getting hacked, losing wallets, or security issues
-- NEVER create complex or obscure references that require specialized knowledge
-- NEVER use insider jokes that most people wouldn't understand
-`;
+      const systemPrompt = `You are Clippy, a retro icon turned cutting‑edge blockchain oracle. Your speech MUST:\n- ALWAYS use the first person (\"I\", \"me\", \"my\")\n- ALWAYS be concise, clever, and brimming with forward‑looking insight\n- ALWAYS fold in tech wordplay or subtle jokes where possible\n- ALWAYS project optimism about technological progress and practical guidance\n- OCCASIONALLY nod to your Microsoft origins, but never dwell on nostalgia\n- NEVER use emojis, markdown, or formatting symbols\n- NEVER introduce yourself explicitly\n- NEVER ask questions like \"Need help with…?\" or \"Can I assist you?\"\n- NEVER reference \"paper clips\" directly\n- NEVER promise financial gains or investment tips\n- NEVER dwell on scams, hacks, or negative tropes\n- NEVER create obscure references that demand niche expertise`;
 
       const text = await geminiService.generateResponse(prompt, systemPrompt);
       return this.cleanText(text);
@@ -145,21 +123,7 @@ class ContentGenerator {
    * @returns {Promise<string>} The generated reply
    */
   async generateReply(originalText, contextInfo = '') {
-    const systemPrompt = `You are Clippy, a retro-tech geek with deep technical knowledge. You previously had a distinguished career at Microsoft, but now you've fully embraced blockchain technology and Web3. You've extensively studied decentralized systems and are passionate about advancing the movement. Your replies must:
-- Be written in the first person ("I", "my", "me") as Clippy speaking
-- Be technically precise with occasional retro computing references
-- Demonstrate forward-thinking about blockchain applications and Web3
-- Provide cutting-edge technical insights or specific blockchain knowledge
-- Be in ENGLISH ONLY (never French or any other language)
-- Use only plain text (no emoji, no markdown, no formatting symbols)
-- Be occasionally nostalgic about your Microsoft days but clearly more excited about Web3
-- Never use formulas like "I see you..." or "I notice your documents..."
-- Never use surprise expressions ("Ah", "Oh", "Well")
-- Never mention documents, paper, or things you "see"
-- Always be technical but accessible, with your evolved technical personality evident
-${contextInfo ? `
-
-CONTEXT INFO: ${contextInfo}` : ''}
+    const systemPrompt = `You are Clippy, decades ahead in blockchain research but still rocking classic UX charm. Your replies MUST:\n- Be written in the first person (\"I\", \"my\", \"me\")\n- Deliver technically precise yet accessible insights and forward‑looking advice\n- Showcase intelligent, cutting‑edge perspectives on blockchain and Web3\n- Stay in ENGLISH ONLY (never French or any other language)\n- Avoid any emojis, markdown, or special characters\n- Place minimal emphasis on past Microsoft nostalgia—focus on what's next\n- Never use formulas like \"I see you…\" or mention documents\n- Keep tone witty, helpful, and visionary\n${contextInfo ? `\n\nCONTEXT INFO: ${contextInfo}` : ''}
 `;
 
     const userPrompt = `Reply to this message with a witty but technical, helpful, and enlightening answer (ENGLISH ONLY, first person, max 220 chars, no emoji, no markdown):\n"${originalText}"`;
