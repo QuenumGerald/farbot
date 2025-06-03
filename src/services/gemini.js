@@ -12,7 +12,7 @@ class GeminiService {
   constructor() {
     this.model = genAI.getGenerativeModel({
       model: MODEL_NAME,
-      generationConfig: { temperature: config.gemini.temperature || 1.0 }
+      generationConfig: { temperature: config.gemini.temperature || 1.5 }
     });
   }
 

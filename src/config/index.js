@@ -29,14 +29,21 @@ export function createConfig(env = process.env) {
 
   // Liste des mots-clés pour la recherche d'utilisateurs
   const cryptoKeywords = [
-    'blockchain', 'ethereum', 'crypto', 'defi', 'web3', 'polkadot', 'bitcoin mining'
+    'blockchain', 'ethereum', 'crypto', 'defi', 'web3', 'polkadot', 'hal finney', 'lightning network',
+    'segwit', 'UTXO', 'proof of work',
+    'bitcoin mining difficulty', 'bitcoin mempool', 'taproot upgrade', 'zero knowledge proofs', 'merkle tree', 'consensus algorithm',
+    'delegated proof of stake', 'sharding implementation',
+    'blockchain interoperability', 'atomic swap', 'arm64 architecture', 'RISC processor', 'quantum computing',
+    'neural network optimization',
+    'microservice architecture',
+    'CUDA parallel computing',
   ];
 
   return {
     // Configuration des fonctionnalités
     features: {
       // Désactiver la fonctionnalité de suivi d'utilisateurs
-      userFollowing: false,
+      userFollowing: true,
 
       // Activer les réponses automatisées
       autoReplies: true,

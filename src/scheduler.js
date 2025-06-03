@@ -4,6 +4,13 @@ import contentGenerator from './services/contentGenerator.js';
 import { createLogger } from './config/logger.js';
 import fs from 'fs';
 import path from 'path';
+import { isBrowserLocked } from './utils/browserLock.js';
+
+// Variable globale pour suivre l'exécution des tâches
+const runningTasks = {
+  replyTask: false,
+  followTask: false
+};
 
 const logger = createLogger('scheduler');
 const HISTORY_PATH = path.resolve(process.cwd(), 'reply_history.json');
@@ -46,6 +53,15 @@ function updateHistory(authorId, history) {
 // Recherche automatique désactivée temporairement
 
 cron.schedule('*/30 * * * *', async () => {
+  // Ne pas exécuter si cette tâche est déjà en cours ou si une autre tâche utilise le navigateur
+  if (runningTasks.replyTask || isBrowserLocked()) {
+    logger.info('Une tâche est déjà en cours d\'exécution ou le navigateur est verrouillé. Planification de la tâche de réponse ignorée.');
+    return;
+  }
+
+  // Marquer la tâche comme en cours
+  runningTasks.replyTask = true;
+
   logger.info('Début du job planifié : recherche et réponse automatique aux messages...');
   const history = loadHistory();
   let nbReplies = 0;
@@ -117,11 +133,13 @@ cron.schedule('*/30 * * * *', async () => {
   } finally {
     await socialActions.close();
     logger.info(`Fin du job planifié. Réponses envoyées: ${nbReplies}, follows: ${followCount || 0}`);
+    // Marquer la tâche comme terminée
+    runningTasks.replyTask = false;
   }
 });
 
-// Tâche pour suivre automatiquement des utilisateurs chaque jour à minuit
-cron.schedule('0 0 * * *', async () => {
+// Tâche pour suivre automatiquement des utilisateurs toutes les minutes
+cron.schedule('*/5 * * * *', async () => {
   // Vérifier si la fonctionnalité de suivi est activée dans la configuration
   const config = (await import('./config/index.js')).default;
 
@@ -129,6 +147,15 @@ cron.schedule('0 0 * * *', async () => {
     logger.info('Fonctionnalité de suivi désactivée dans la configuration, tâche annulée.');
     return;
   }
+
+  // Ne pas exécuter si cette tâche est déjà en cours ou si une autre tâche utilise le navigateur
+  if (runningTasks.followTask || isBrowserLocked()) {
+    logger.info('Une tâche est déjà en cours d\'exécution ou le navigateur est verrouillé. Planification de la tâche de follow ignorée.');
+    return;
+  }
+
+  // Marquer la tâche comme en cours
+  runningTasks.followTask = true;
 
   logger.info('Début du job planifié : recherche et follow automatique d\'utilisateurs...');
   let followCount = 0;
@@ -145,6 +172,8 @@ cron.schedule('0 0 * * *', async () => {
   } finally {
     await socialActions.close();
     logger.info(`Fin du job de follow. Utilisateurs suivis: ${followCount}`);
+    // Marquer la tâche comme terminée
+    runningTasks.followTask = false;
   }
 });
 
