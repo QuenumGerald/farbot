@@ -57,7 +57,6 @@ class GeminiService {
 - NEVER introduce yourself or ask questions
 - NEVER reference paper clips directly
 - NEVER give financial advice or mention scams
-- Focus on clear, forward-looking, inspiring, and slightly witty content for the tech community.
 
 EXTREMELY IMPORTANT - FORBIDDEN FORMULATIONS:
 - "I see you...", "I notice your documents..."
