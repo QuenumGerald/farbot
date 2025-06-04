@@ -621,39 +621,47 @@ class SocialActions {
       // Utiliser la page existante ou en créer une nouvelle si nécessaire
       page = await this.ensurePage(false);  // false = ne pas forcer la création d'une nouvelle page
       
-      // Rechercher des utilisateurs
+      // Nouvelle logique : boucle pour scroller jusqu'à trouver un follow possible
       let users = [];
-      try {
-        users = await searchUsersByKeywords(keyword);
-        console.log(`Trouvé ${users.length} utilisateurs potentiels avec le mot-clé "${keyword}"`);
-      } catch (searchError) {
-        console.error(`Erreur lors de la recherche d'utilisateurs:`, searchError.message);
-        // Si une erreur se produit pendant la recherche, vérifier si la page est toujours valide
+      let lastUsersCount = 0;
+      let scrollAttempts = 0;
+      const maxScrollAttempts = 10; // sécurité pour éviter boucle infinie
+      while (scrollAttempts < maxScrollAttempts) {
         try {
-          // Tenter une navigation simple pour vérifier si la page est valide
-          await page.goto('https://farcaster.xyz/', { waitUntil: 'networkidle2', timeout: 15000 });
-        } catch (pageError) {
-          console.error('Page non valide, réinitialisation nécessaire');
-          // Réinitialiser la page complètement
-          }
-          
-          // Ajouter des options de timeout plus longues pour les réseaux lents
-          await page.goto(url, { 
-            waitUntil: 'networkidle2', 
-            timeout: 30000  // 30 secondes de timeout
-          });
-          console.log(`Navigation réussie vers ${url} (tentative ${attempt}/${maxRetries})`);
-          return true;
-        } catch (error) {
-          console.error(`Erreur de navigation (tentative ${attempt}/${maxRetries}):`, error.message);
-          if (attempt === maxRetries) return false;
-          
-          // Attendre avant de réessayer
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          users = await searchUsersByKeywords(keyword);
+          console.log(`Trouvé ${users.length} utilisateurs potentiels avec le mot-clé "${keyword}" (tentative scroll ${scrollAttempts})`);
+        } catch (searchError) {
+          console.error(`Erreur lors de la recherche d'utilisateurs:`, searchError.message);
+          break;
         }
+        // Vérifier s'il y a au moins un utilisateur non-suivi
+        let hasFollowable = false;
+        for (const user of users) {
+          const username = user.username || user.displayName || '';
+          if (!username) continue;
+          const userKey = username.toLowerCase();
+          if (!followHistory[userKey]) {
+            hasFollowable = true;
+            break;
+          }
+        }
+        if (hasFollowable) {
+          break; // On a trouvé au moins un utilisateur à follow
+        }
+        // Si la liste n'a pas changé, on arrête
+        if (users.length === lastUsersCount) {
+          console.log('Plus de nouveaux utilisateurs à charger, arrêt du scroll.');
+          break;
+        }
+        lastUsersCount = users.length;
+        // Scroll en bas de la page pour charger plus d’utilisateurs
+        await page.evaluate(() => {
+          window.scrollTo(0, document.body.scrollHeight);
+        });
+        await page.waitForTimeout(2000); // attendre le chargement
+        scrollAttempts++;
       }
-      return false;
-    };
+    
 
     // Parcourir tous les utilisateurs trouvés jusqu'à atteindre maxFollows
     for (const user of users) {

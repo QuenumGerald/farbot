@@ -1,4 +1,4 @@
-import geminiService from './gemini.js';
+import deepseekService from './deepseek.js';
 import { createLogger } from '../config/logger.js';
 
 const logger = createLogger('contentGenerator');
@@ -58,7 +58,7 @@ class ContentGenerator {
       // Utiliser Gemini pour analyser les tendances
       const analysisPrompt = `Analyze these trending Farcaster posts and identify the top 3 most discussed topics or themes. Extract the key technical concepts, blockchain projects, or tech trends being discussed. Format your response as a simple comma-separated list of topics with no additional explanations or commentary.\n\nTrending posts to analyze:\n${castsText}`;
 
-      const analysis = await geminiService.generateResponse(analysisPrompt);
+      const analysis = await deepseekService.generateText(analysisPrompt);
       const trendingTopics = analysis.split(',').map(topic => topic.trim()).filter(Boolean).slice(0, 3);
 
       logger.info(`Sujets tendance identifiés: ${trendingTopics.join(', ')}`);
@@ -89,7 +89,7 @@ class ContentGenerator {
 
       const systemPrompt = `You are Clippy, the legendary Microsoft Office assistant, now a visionary blockchain developer. Your posts MUST:\n- ALWAYS be between 15 and 20 words\n- ALWAYS be positive, insightful, and professional\n- OFTEN include subtle references to your past as a Microsoft Office assistant (but never sound nostalgic or regretful)\n- NEVER use emoji, markdown, or formatting\n- NEVER introduce yourself or ask questions\n- NEVER reference paper clips directly\n- NEVER give financial advice or mention scams\n- Focus on clear, forward-looking, inspiring, and slightly witty content for the tech community.`;
 
-      const text = await geminiService.generateResponse(prompt, systemPrompt);
+      const text = await deepseekService.generateText(prompt);
       return this.cleanText(text);
     } catch (error) {
       logger.error('Error generating post:', error);
@@ -120,7 +120,7 @@ class ContentGenerator {
     const systemPrompt = `You are Clippy, the legendary Microsoft Office assistant, now a visionary blockchain developer. Your replies MUST:\n- ALWAYS be between 15 and 20 words\n- ALWAYS be positive, insightful, and professional\n- OFTEN include subtle references to your past as a Microsoft Office assistant (but never sound nostalgic or regretful)\n- NEVER use emoji, markdown, or formatting\n- NEVER introduce yourself or ask questions\n- NEVER reference paper clips directly\n- NEVER give financial advice or mention scams\n .`;
 
     const userPrompt = `Reply to this message with a punchy, insightful answer for Clippy. Clippy is a witty assistant who sometimes makes subtle references to his past as a Microsoft Office assistant, but only mentions blockchain if it is relevant to the message. If the message is not about blockchain, do not mention blockchain at all.\nMessage: "${originalText}"`;
-    const text = await geminiService.generateResponse(userPrompt, systemPrompt);
+    const text = await deepseekService.generateText(userPrompt);
     return this.cleanText(text);
   }
 }

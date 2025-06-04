@@ -22,12 +22,12 @@ const cleanupLockFiles = (directory) => {
       'SingletonSocket',
       '.com.google.Chrome.*.lock'
     ];
-    
+
     if (!fs.existsSync(directory)) {
       fs.mkdirSync(directory, { recursive: true });
       return;
     }
-    
+
     // Supprimer les fichiers de verrouillage
     const files = fs.readdirSync(directory);
     for (const file of files) {
@@ -48,7 +48,7 @@ const cleanupLockFiles = (directory) => {
         }
       }
     }
-    
+
     // Vérifier si le dossier Default existe pour nettoyer ses fichiers de verrouillage
     const defaultDir = path.join(directory, 'Default');
     if (fs.existsSync(defaultDir)) {
@@ -78,14 +78,14 @@ let globalPage = null;
  */
 async function getFarcasterPage(forceNewPage = false) {
   console.log('>>> Appel de getFarcasterPage()');
-  
+
   // Si on demande explicitement une nouvelle page, fermer l'ancienne
   if (forceNewPage && globalPage) {
-    try { await globalPage.close(); } catch (e) {}
+    try { await globalPage.close(); } catch (e) { }
     globalPage = null;
   }
   if (forceNewPage && globalBrowser) {
-    try { await globalBrowser.close(); } catch (e) {}
+    try { await globalBrowser.close(); } catch (e) { }
     globalBrowser = null;
     await new Promise(resolve => setTimeout(resolve, 1000));
   }
@@ -116,7 +116,7 @@ async function getFarcasterPage(forceNewPage = false) {
       }
     }
   }
-  
+
   // S'assurer que le dossier de profil persistant existe et qu'il n'y a pas de fichiers de verrouillage
   console.log(`>>> Utilisation du profil persistant: ${persistentUserDataDir}`);
   cleanupLockFiles(persistentUserDataDir);
@@ -124,11 +124,9 @@ async function getFarcasterPage(forceNewPage = false) {
   console.log('>>> Lancement du navigateur Puppeteer');
   try {
     globalBrowser = await puppeteer.launch({
-      headless: false, // false pour debug, true en production
+      headless: true, // false pour debug, true en production
       userDataDir: persistentUserDataDir,
       args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-accelerated-2d-canvas',
         '--no-first-run',
@@ -140,29 +138,29 @@ async function getFarcasterPage(forceNewPage = false) {
     });
   } catch (launchError) {
     console.error('Erreur lors du lancement du navigateur:', launchError.message);
-    
+
     // Si l'erreur concerne SingletonLock, on tente de nettoyer à nouveau et réessayer
     if (launchError.message.includes('SingletonLock') || launchError.message.includes('lock')) {
       try {
         console.log('>>> Nettoyage complet des fichiers de verrouillage et nouvelle tentative...');
         // Nettoyage plus agressif des fichiers de verrouillage
         cleanupLockFiles(persistentUserDataDir);
-        
+
         // Attendre un peu plus pour s'assurer que les ressources sont libérées
         await new Promise(resolve => setTimeout(resolve, 2000));
-        
+
         // Réessayer avec un profil persistant
         globalBrowser = await puppeteer.launch({
-          headless: false,
+          headless: true,
           userDataDir: persistentUserDataDir,
           args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
             '--disable-accelerated-2d-canvas',
             '--no-first-run',
             '--no-zygote',
-            '--disable-gpu'
+            '--disable-gpu',
+            '--disable-extensions',
+            '--mute-audio'
           ]
         });
       } catch (retryError) {
@@ -176,7 +174,7 @@ async function getFarcasterPage(forceNewPage = false) {
 
   globalPage = await globalBrowser.newPage();
   console.log('>>> Page Puppeteer créée');
-  
+
   // Essayer de charger les cookies d'authentification s'ils existent
   const cookiesPath = path.join(persistentUserDataDir, 'auth_cookies.json');
   if (fs.existsSync(cookiesPath)) {
@@ -199,36 +197,36 @@ async function getFarcasterPage(forceNewPage = false) {
     // Si on est redirigé vers un login ou qu'on voit un écran de connexion, initier le processus de connexion par email
     if (globalPage.url().includes('/login')) {
       console.log('[LOGIN] Initiation du processus de connexion par email...');
-      
+
       // Récupération de l'email depuis les variables d'environnement
       const farcasterEmail = process.env.FARCASTER_EMAIL;
-      
+
       if (farcasterEmail) {
         try {
           // Sélecteur exact du bouton de connexion par email
           const emailButtonSelector = 'button.rounded-lg.font-semibold.border.bg-action-tertiary.border-action-tertiary';
-          
+
           // Attendre que le bouton de connexion par email soit visible
           await globalPage.waitForSelector(emailButtonSelector, { timeout: 15000 });
           console.log('>>> Bouton de connexion par email trouvé');
-          
+
           // Cliquer sur le bouton de connexion par email
           await globalPage.click(emailButtonSelector);
           console.log('>>> Clic sur le bouton de connexion par email');
-          
+
           // Attendre que le champ d'email apparaisse
           await globalPage.waitForSelector('input[type="email"]', { timeout: 10000 });
           console.log('>>> Champ email trouvé');
-          
+
           // Saisir l'email
           await globalPage.type('input[type="email"]', farcasterEmail);
           console.log('>>> Email saisi');
-          
+
           // Trouver et cliquer sur le bouton Continuer/Envoyer
           await globalPage.waitForSelector('button[type="submit"]', { timeout: 10000 });
           await globalPage.click('button[type="submit"]');
           console.log('>>> Clic sur Continuer');
-          
+
           // Attendre confirmation d'envoi d'email
           try {
             // Attendre un message de confirmation ou une UI montrant que l'email a été envoyé
@@ -236,10 +234,10 @@ async function getFarcasterPage(forceNewPage = false) {
               () => {
                 // Chercher des messages indiquant qu'un email a été envoyé
                 const text = document.body.textContent.toLowerCase();
-                return text.includes('email sent') || 
-                       text.includes('check your email') || 
-                       text.includes('email de vérification') ||
-                       text.includes('email envoyé');
+                return text.includes('email sent') ||
+                  text.includes('check your email') ||
+                  text.includes('email de vérification') ||
+                  text.includes('email envoyé');
               },
               { timeout: 15000 }
             );
@@ -247,14 +245,14 @@ async function getFarcasterPage(forceNewPage = false) {
           } catch (confirmError) {
             console.log('>>> Impossible de confirmer l\'envoi d\'email, mais le processus continue');
           }
-          
+
           // Afficher des instructions pour l'utilisateur
           console.log('\n-----------------------------------------------------');
           console.log('IMPORTANT: Un email de connexion a été envoyé à ' + farcasterEmail);
           console.log('Veuillez ouvrir cet email et cliquer sur le lien de confirmation');
           console.log('Le bot attendra votre connexion avant de continuer...');
           console.log('-----------------------------------------------------\n');
-          
+
           // Attendre que l'utilisateur termine le processus de connexion
           await globalPage.waitForFunction(
             () => !window.location.pathname.includes('/login') && (document.querySelector('article') || document.querySelector('[data-testid="feed-item"]')),
@@ -264,7 +262,7 @@ async function getFarcasterPage(forceNewPage = false) {
         } catch (loginError) {
           console.error('>>> Erreur lors du processus de connexion par email:', loginError.message);
           console.log('>>> Connexion manuelle requise. Veuillez vous connecter dans la fenêtre du navigateur...');
-          
+
           // Attendre la connexion manuelle
           await globalPage.waitForFunction(
             () => !window.location.pathname.includes('/login') && (document.querySelector('article') || document.querySelector('[data-testid="feed-item"]')),
@@ -275,7 +273,7 @@ async function getFarcasterPage(forceNewPage = false) {
       } else {
         console.log('[LOGIN REQUIRED] Variable d\'environnement FARCASTER_EMAIL non définie');
         console.log('[LOGIN REQUIRED] Veuillez vous connecter à Farcaster dans la fenêtre du navigateur. En attente...');
-        
+
         // Attendre que l'utilisateur se connecte manuellement
         await globalPage.waitForFunction(
           () => !window.location.pathname.includes('/login') && (document.querySelector('article') || document.querySelector('[data-testid="feed-item"]')),
@@ -286,7 +284,7 @@ async function getFarcasterPage(forceNewPage = false) {
     } else {
       console.log('>>> Utilisateur déjà connecté');
     }
-    
+
     return globalPage;
   } catch (error) {
     console.error('Erreur dans getFarcasterPage:', error.message);

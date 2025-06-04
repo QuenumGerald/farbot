@@ -9,31 +9,31 @@ class SocialActions {
     if (!text) return '';
     return text.split(/\s+/).slice(0, 10).join(' ').toLowerCase();
   }
-  
+
   // Vérifie si l'auteur a déjà reçu une réponse dans les 15 derniers jours
   static hasRespondedToAuthorRecently(history, author, daysThreshold = 15) {
     if (!author || !history) return false;
-    
+
     const now = new Date();
     const authorLower = author.toLowerCase();
-    
+
     // Parcourir tous les messages dans l'historique
     for (const key in history) {
       const entry = history[key];
-      
+
       // Vérifier si l'auteur correspond et si la réponse a été envoyée
       if (entry.author && entry.author.toLowerCase() === authorLower && entry.responded) {
         // Vérifier la date (si moins de X jours)
         const responseDate = new Date(entry.date);
         const diffTime = Math.abs(now - responseDate);
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        
+
         if (diffDays < daysThreshold) {
           return true; // A répondu à cet auteur récemment
         }
       }
     }
-    
+
     return false; // Pas de réponse récente à cet auteur
   }
 
@@ -41,7 +41,7 @@ class SocialActions {
   static getHistoryPath() {
     return path.resolve(process.cwd(), 'reply_history.json');
   }
-  
+
   // Chemin absolu vers le fichier d'historique des suivis
   static getFollowHistoryPath() {
     return path.resolve(process.cwd(), 'follow_history.json');
@@ -69,7 +69,7 @@ class SocialActions {
       console.error('Erreur sauvegarde historique:', e.message);
     }
   }
-  
+
   // Charge l'historique des utilisateurs suivis
   static loadFollowHistory() {
     const file = SocialActions.getFollowHistoryPath();
@@ -82,7 +82,7 @@ class SocialActions {
       return {};
     }
   }
-  
+
   // Sauvegarde l'historique des utilisateurs suivis
   static saveFollowHistory(history) {
     const file = SocialActions.getFollowHistoryPath();
@@ -151,20 +151,20 @@ class SocialActions {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         // Force refresh page on retries (after 1st attempt) to ensure a clean state
-        currentPage = await this.ensurePage(attempt > 1); 
-        
+        currentPage = await this.ensurePage(attempt > 1);
+
         // Navigue vers l'URL avec un timeout plus long
-        await currentPage.goto(url, { 
-          waitUntil: 'networkidle2', 
+        await currentPage.goto(url, {
+          waitUntil: 'networkidle2',
           timeout: 45000  // Augmenter le timeout à 45 secondes
         });
-        
+
         // Attendre que la page soit bien chargée et stabilisée
         await currentPage.evaluate(() => new Promise(r => setTimeout(r, 3000)));
-        
+
         // Vérifier que la page n'est pas détachée en essayant d'accéder à son titre
         await currentPage.title();
-        
+
         console.log(`Navigation réussie vers ${url} (tentative ${attempt}/${maxRetries})`);
         return true;
       } catch (error) {
@@ -176,7 +176,7 @@ class SocialActions {
         await new Promise(resolve => setTimeout(resolve, 3000 * attempt)); // Attendre plus longtemps entre les tentatives
       }
     }
-    return false; 
+    return false;
   }
 
   /**
@@ -341,7 +341,7 @@ class SocialActions {
       this.page = null;
     }
   }
-  
+
   /**
    * Stabilise l'environnement Puppeteer - ferme et réouvre la page
    * @returns {Promise<import('puppeteer').Page>} La nouvelle page
@@ -427,10 +427,10 @@ class SocialActions {
 
           // Vérifier si le message contient un des mots-clés de réponse (si spécifiés)
           if (replyKeywords.length > 0) {
-            const hasReplyKeyword = replyKeywords.some(kw => 
+            const hasReplyKeyword = replyKeywords.some(kw =>
               content.toLowerCase().includes(kw.toLowerCase())
             );
-            
+
             if (!hasReplyKeyword) {
               console.log('Aucun mot-clé de réponse trouvé dans le message, passage au suivant');
               skippedCount++;
@@ -494,18 +494,18 @@ class SocialActions {
             skippedCount++;
             continue;
           }
-          
+
           // Vérifier si on a déjà répondu à cet auteur dans les 15 derniers jours
           if (SocialActions.hasRespondedToAuthorRecently(replyHistory, author)) {
             console.log(`Déjà répondu à l'auteur "${author}" dans les 15 derniers jours, passage au suivant`);
             skippedCount++;
             continue;
           }
-          
+
           // Générer une réponse avec Gemini
           console.log('Génération d\'une réponse avec Gemini...');
           const response = await generateResponse(content, author);
-          
+
           if (!response) {
             console.log('Pas de réponse générée, passage au suivant');
             continue;
@@ -515,7 +515,7 @@ class SocialActions {
 
           // Cliquer sur le bouton de réponse
           console.log('Clic sur le bouton de réponse...');
-          
+
           try {
             // Vérifier que le bouton est toujours attaché à la page
             await replyButton.click();
@@ -531,7 +531,7 @@ class SocialActions {
           const modalVisible = await page.evaluate(() => {
             return !!document.querySelector('div[role="textbox"], [contenteditable="true"], textarea');
           });
-          
+
           if (!modalVisible) {
             console.log('La modale de réponse ne s\'est pas ouverte correctement, on passe au message suivant');
             continue;
@@ -671,22 +671,22 @@ class SocialActions {
     let followCount = 0;
     const maxFollows = 10; // Nombre maximum d'utilisateurs à suivre par session
     let page = null;
-    
+
     // Importer la configuration pour accéder aux mots-clés
     const { cryptoKeywords } = (await import('../config/index.js')).default;
-    
+
     // Sélectionner un mot-clé aléatoire
     const keyword = cryptoKeywords[Math.floor(Math.random() * cryptoKeywords.length)];
     console.log(`Recherche d'utilisateurs avec le mot-clé: ${keyword}`);
-    
+
     // Charger l'historique des follows
     const followHistory = SocialActions.loadFollowHistory();
-    
+
     try {
-      
+
       // Utiliser la page existante ou en créer une nouvelle si nécessaire
       page = await this.ensurePage(false);  // false = ne pas forcer la création d'une nouvelle page
-      
+
       // Rechercher des utilisateurs
       let users = [];
       try {
@@ -697,7 +697,7 @@ class SocialActions {
         // Si une erreur se produit pendant la recherche, vérifier si la page est toujours valide
         try {
           // Tenter une navigation simple pour vérifier si la page est valide
-          await page.goto('https://farcaster.xyz/', { waitUntil: 'networkidle2', timeout: 15000 });
+          await page.goto('https://farcaster.xyz/', { waitUntil: 'networkidle2', timeout: 45000 });
         } catch (pageError) {
           console.error('Page non valide, réinitialisation nécessaire');
           // Réinitialiser la page complètement
@@ -705,53 +705,53 @@ class SocialActions {
           return followCount;
         }
       }
-      
+
       // Si aucun utilisateur trouvé, terminer
       if (users.length === 0) {
         return followCount;
       }
-      
+
       // Parcourir les utilisateurs trouvés jusqu'à atteindre le nombre maximum de follows
       for (const user of users) {
         if (followCount >= maxFollows) {
           console.log(`Nombre maximum de follows atteint (${maxFollows}).`);
           break;
         }
-        
+
         const username = user.username || user.displayName || '';
-        
+
         if (!username) {
           console.log('Utilisateur sans nom d\'utilisateur, on passe au suivant');
           continue;
         }
-        
+
         const userKey = username.toLowerCase();
         const daysThreshold = 30; // Ne pas refollow avant 30 jours
-        
+
         // Vérifier si déjà suivi récemment
         if (followHistory[userKey]) {
           const followDate = new Date(followHistory[userKey].date);
           const now = new Date();
           const diffTime = Math.abs(now - followDate);
           const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-          
+
           if (diffDays < daysThreshold) {
             console.log(`Déjà suivi ${username} dans les ${daysThreshold} derniers jours, on passe au suivant`);
             continue;
           }
         }
-        
+
         // Essayer de naviguer vers le profil avec plusieurs tentatives
         const profileUrl = `https://farcaster.xyz/${username}`;
         console.log(`Navigation vers le profil: ${profileUrl}`);
-        
+
         // Tenter de naviguer avec réessais
         const navigationSuccess = await this.navigateWithRetries(profileUrl);
         if (!navigationSuccess) {
           console.log(`Échec de la navigation vers le profil de ${username} après plusieurs tentatives`);
           continue;
         }
-        
+
         // Attendre le chargement complet et vérifier la présence du bouton
         try {
           // Attendre d'abord que la page soit complètement chargée et statisée pour éviter les frames détachés
@@ -759,7 +759,7 @@ class SocialActions {
             // Attendre que la page soit stable
             setTimeout(resolve, 3000);
           }));
-          
+
           // S'assurer que le frame est toujours valide avant de continuer
           try {
             await page.title(); // Simple vérification de validité du frame
@@ -770,7 +770,7 @@ class SocialActions {
             await page.goto(`https://farcaster.xyz/${username}`, { waitUntil: 'networkidle2', timeout: 30000 });
             await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 3000)));
           }
-          
+
           // Utiliser un sélecteur CSS plus précis basé sur les classes du bouton
           const followBtnSelector = 'button.rounded-lg.font-semibold.border.border-transparent.bg-action-primary.text-light';
           await page.waitForSelector(followBtnSelector, { timeout: 15000 });
@@ -779,7 +779,7 @@ class SocialActions {
           console.error('Impossible de trouver le bouton Follow sur le profil:', error.message);
           continue;
         }
-        
+
         // Vérifier si on suit déjà l'utilisateur
         const isFollowing = await page.evaluate(() => {
           // Chercher d'abord le bouton 'Following'
@@ -787,14 +787,14 @@ class SocialActions {
             .find(btn => btn.textContent && btn.textContent.trim() === 'Following');
           return !!followingButton;
         });
-        
+
         if (isFollowing) {
           console.log(`On suit déjà ${username}, on passe au suivant`);
           // Mettre à jour la date du follow dans l'historique
           followHistory[userKey] = { date: new Date().toISOString() };
           continue;
         }
-        
+
         // Essayer de cliquer sur le bouton Follow avec plus de robustesse
         try {
           // Double vérification que le frame est toujours valide
@@ -805,16 +805,16 @@ class SocialActions {
             // Si encore des problèmes, on passe au suivant
             continue;
           }
-          
+
           // Attendre un peu avant d'essayer de cliquer
           await page.evaluate(() => new Promise(r => setTimeout(r, 1000)));
-          
+
           // Essayer d'abord avec la méthode evaluate (plus fiable)
           let clickSuccess = await page.evaluate(() => {
             try {
               const followBtn = Array.from(document.querySelectorAll('button.rounded-lg.font-semibold.border.border-transparent.bg-action-primary.text-light'))
                 .find(btn => btn.textContent && btn.textContent.trim() === 'Follow');
-              
+
               if (followBtn) {
                 followBtn.click();
                 return true;
@@ -822,7 +822,7 @@ class SocialActions {
             } catch (e) { /* ignorer les erreurs internes */ }
             return false;
           });
-          
+
           // Si ça n'a pas marché, essayer avec un clic direct sur le sélecteur
           if (!clickSuccess) {
             try {
@@ -833,34 +833,34 @@ class SocialActions {
               console.log(`Tentative de clic direct échouée pour ${username}: ${clickErr.message}`);
             }
           }
-          
+
           if (clickSuccess) {
             // Attendre la confirmation du suivi
             await page.evaluate(() => new Promise(r => setTimeout(r, 2000)));
             console.log(`Suivi de l'utilisateur ${username} réussi !`);
             followCount++;
-            
+
             // Mettre à jour l'historique des follows
             followHistory[userKey] = { date: new Date().toISOString() };
-            
+
             // Sauvegarder l'historique après chaque follow réussi
             SocialActions.saveFollowHistory(followHistory);
-            
+
             // Attendre un peu plus longtemps avant de passer à l'utilisateur suivant (anti-bot)
             await new Promise(resolve => setTimeout(resolve, 5000));
           } else {
             console.log(`Bouton Follow non trouvé ou non cliquable pour ${username}`);
             continue;
           }
-          
+
         } catch (error) {
           console.error(`Erreur lors du suivi de ${username}:`, error.message);
         }
       }
-      
+
       // Retourner le nombre d'utilisateurs suivis avec succès
       return followCount;
-      
+
     } catch (error) {
       console.error('Erreur lors de la recherche et follow d\'utilisateurs:', error);
       return followCount;
@@ -880,209 +880,209 @@ class SocialActions {
     let skippedCount = 0;
 
     try {
-    // Aller sur le fil d'accueil Farcaster
-    const homeUrl = 'https://farcaster.xyz/';
-    console.log(`Navigation vers le fil d'accueil: ${homeUrl}`);
-    await page.goto(homeUrl, { waitUntil: 'networkidle2', timeout: 15000 });
-    await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 5000)));
+      // Aller sur le fil d'accueil Farcaster
+      const homeUrl = 'https://farcaster.xyz/';
+      console.log(`Navigation vers le fil d'accueil: ${homeUrl}`);
+      await page.goto(homeUrl, { waitUntil: 'networkidle2', timeout: 45000 });
+      await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 5000)));
 
-    // Sélecteur pour trouver tous les messages sur le fil d'accueil
-    const messageItems = await page.$$('.relative.cursor-pointer.px-4.py-2, div.cursor-pointer:has(div.line-clamp-feed)');
-    console.log(`Trouvé ${messageItems.length} messages potentiels sur le fil d'accueil`);
+      // Sélecteur pour trouver tous les messages sur le fil d'accueil
+      const messageItems = await page.$$('.relative.cursor-pointer.px-4.py-2, div.cursor-pointer:has(div.line-clamp-feed)');
+      console.log(`Trouvé ${messageItems.length} messages potentiels sur le fil d'accueil`);
 
-    // Charger l'historique des réponses
-    const replyHistory = SocialActions.loadReplyHistory();
-    for (let i = 0; i < messageItems.length && responsesCount < maxResponses; i++) {
-      try {
-        const messageItem = messageItems[i];
-        // Extraire le contenu du message
-        const content = await page.evaluate(el => {
-          const textElement = el.querySelector('.line-clamp-feed');
-          return textElement ? textElement.textContent.trim() : '';
-        }, messageItem);
-        // Calculer les 10 premiers mots
-        const first10 = SocialActions.getFirst10Words(content);
-        // Extraire l'auteur
-        const author = await page.evaluate(el => {
-          const authorElement =
-            el.querySelector('span a.font-semibold') ||
-            el.querySelector('div.font-semibold') ||
-            el.querySelector('a[href^="/"]:not([href*="/~/"])');
-          const authorName = authorElement ? authorElement.textContent.trim() : '';
-          return authorName || 'utilisateur_inconnu';
-        }, messageItem);
-        if (!content) {
-          console.log('Message sans contenu, passage au suivant');
-          continue;
-        }
-        console.log(`Message ${i + 1}/${messageItems.length} par ${author}: ${content.substring(0, 30)}...`);
-        // Filtrage par mots-clés
-        if (replyKeywords.length > 0) {
-          const hasReplyKeyword = replyKeywords.some(kw => content.toLowerCase().includes(kw.toLowerCase()));
-          if (!hasReplyKeyword) {
-            console.log('Aucun mot-clé de réponse trouvé dans le message, passage au suivant');
+      // Charger l'historique des réponses
+      const replyHistory = SocialActions.loadReplyHistory();
+      for (let i = 0; i < messageItems.length && responsesCount < maxResponses; i++) {
+        try {
+          const messageItem = messageItems[i];
+          // Extraire le contenu du message
+          const content = await page.evaluate(el => {
+            const textElement = el.querySelector('.line-clamp-feed');
+            return textElement ? textElement.textContent.trim() : '';
+          }, messageItem);
+          // Calculer les 10 premiers mots
+          const first10 = SocialActions.getFirst10Words(content);
+          // Extraire l'auteur
+          const author = await page.evaluate(el => {
+            const authorElement =
+              el.querySelector('span a.font-semibold') ||
+              el.querySelector('div.font-semibold') ||
+              el.querySelector('a[href^="/"]:not([href*="/~/"])');
+            const authorName = authorElement ? authorElement.textContent.trim() : '';
+            return authorName || 'utilisateur_inconnu';
+          }, messageItem);
+          if (!content) {
+            console.log('Message sans contenu, passage au suivant');
+            continue;
+          }
+          console.log(`Message ${i + 1}/${messageItems.length} par ${author}: ${content.substring(0, 30)}...`);
+          // Filtrage par mots-clés
+          if (replyKeywords.length > 0) {
+            const hasReplyKeyword = replyKeywords.some(kw => content.toLowerCase().includes(kw.toLowerCase()));
+            if (!hasReplyKeyword) {
+              console.log('Aucun mot-clé de réponse trouvé dans le message, passage au suivant');
+              skippedCount++;
+              continue;
+            }
+          }
+          // Vérifier historique
+          if (replyHistory[first10]) {
+            console.log('Déjà répondu à ce message (10 premiers mots identiques), passage au suivant');
             skippedCount++;
             continue;
           }
-        }
-        // Vérifier historique
-        if (replyHistory[first10]) {
-          console.log('Déjà répondu à ce message (10 premiers mots identiques), passage au suivant');
-          skippedCount++;
-          continue;
-        }
-        if (SocialActions.hasRespondedToAuthorRecently(replyHistory, author)) {
-          console.log(`Déjà répondu à l'auteur "${author}" récemment, passage au suivant`);
-          skippedCount++;
-          continue;
-        }
-        // Générer une réponse
-        console.log('Génération d\'une réponse avec Gemini...');
-        const response = await generateResponse(content, author);
-        if (!response) {
-          console.log('Pas de réponse générée, passage au suivant');
-          continue;
-        }
-        // Cliquer sur le bouton de réponse
-        let replyButton = await messageItem.$('div.group.flex.w-max.flex-row.items-center.text-sm.text-faint.cursor-pointer');
-        if (!replyButton) {
-          replyButton = await messageItem.$('div:has(svg path[d^="M1.625 3.09375"][fill="#9FA3AF"])');
-        }
-        if (!replyButton) {
-          replyButton = await messageItem.$('.group.flex:has(svg path[fill="#9FA3AF"])');
-        }
-        if (!replyButton) {
-          try {
-            const allButtons = await messageItem.$$('div.group.flex');
-            for (const button of allButtons) {
-              const hasCommentIcon = await button.evaluate(el => {
-                const svgPath = el.querySelector('svg path');
-                return svgPath && svgPath.getAttribute('d') && svgPath.getAttribute('d').startsWith('M1.625 3.09375');
-              });
-              if (hasCommentIcon) {
-                replyButton = button;
-                break;
+          if (SocialActions.hasRespondedToAuthorRecently(replyHistory, author)) {
+            console.log(`Déjà répondu à l'auteur "${author}" récemment, passage au suivant`);
+            skippedCount++;
+            continue;
+          }
+          // Générer une réponse
+          console.log('Génération d\'une réponse avec Gemini...');
+          const response = await generateResponse(content, author);
+          if (!response) {
+            console.log('Pas de réponse générée, passage au suivant');
+            continue;
+          }
+          // Cliquer sur le bouton de réponse
+          let replyButton = await messageItem.$('div.group.flex.w-max.flex-row.items-center.text-sm.text-faint.cursor-pointer');
+          if (!replyButton) {
+            replyButton = await messageItem.$('div:has(svg path[d^="M1.625 3.09375"][fill="#9FA3AF"])');
+          }
+          if (!replyButton) {
+            replyButton = await messageItem.$('.group.flex:has(svg path[fill="#9FA3AF"])');
+          }
+          if (!replyButton) {
+            try {
+              const allButtons = await messageItem.$$('div.group.flex');
+              for (const button of allButtons) {
+                const hasCommentIcon = await button.evaluate(el => {
+                  const svgPath = el.querySelector('svg path');
+                  return svgPath && svgPath.getAttribute('d') && svgPath.getAttribute('d').startsWith('M1.625 3.09375');
+                });
+                if (hasCommentIcon) {
+                  replyButton = button;
+                  break;
+                }
               }
+            } catch (error) {
+              console.error('Erreur lors de la recherche du bouton de réponse:', error.message);
+            }
+          }
+          if (!replyButton) {
+            console.log('Bouton de réponse introuvable après toutes les stratégies, passage au message suivant');
+            continue;
+          }
+          console.log('Bouton de réponse trouvé !');
+          // Clic sur le bouton de réponse
+          try {
+            await replyButton.click();
+          } catch (clickError) {
+            console.error('Erreur lors du clic sur le bouton de réponse:', clickError.message);
+            continue;
+          }
+          await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 5000)));
+          // Vérifier si la modale est ouverte
+          const modalVisible = await page.evaluate(() => {
+            return !!document.querySelector('div[role="textbox"], [contenteditable="true"], textarea');
+          });
+          if (!modalVisible) {
+            console.log('La modale de réponse ne s\'est pas ouverte correctement, on passe au message suivant');
+            continue;
+          }
+          try {
+            await page.waitForSelector('div[role="textbox"], [contenteditable="true"], textarea', { visible: true, timeout: 10000 });
+          } catch (selectorError) {
+            console.error('Erreur lors de l\'attente du champ de texte:', selectorError.message);
+            continue;
+          }
+          console.log('Saisie de la réponse...');
+          await page.type('div[role="textbox"], [contenteditable="true"], textarea', response);
+          // Cliquer sur le bouton d'envoi
+          const exactSelector = 'button.rounded-lg.font-semibold.border.border-transparent.bg-action-primary.text-light[title="Reply"]';
+          await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 1000)));
+          try {
+            let sendButton = await page.$(exactSelector);
+            if (!sendButton) {
+              sendButton = await page.$('button.rounded-lg.font-semibold[title="Reply"]');
+            }
+            if (!sendButton) {
+              sendButton = await page.$('button.bg-action-primary.text-light');
+            }
+            if (!sendButton) {
+              const buttons = await page.$$('button');
+              for (const btn of buttons) {
+                const text = await page.evaluate(el => el.textContent?.trim(), btn);
+                if (text === 'Reply') {
+                  sendButton = btn;
+                  break;
+                }
+              }
+            }
+            if (!sendButton) {
+              await page.evaluate(() => {
+                const buttons = Array.from(document.querySelectorAll('button'));
+                const replyButton = buttons.find(btn => btn.textContent?.trim() === 'Reply');
+                if (replyButton) {
+                  replyButton.click();
+                  return true;
+                }
+                return false;
+              });
+            } else {
+              await sendButton.click();
+              await page.evaluate(element => { element.click(); }, sendButton);
+              await page.evaluate(element => {
+                const event = new MouseEvent('click', { bubbles: true, cancelable: true, view: window });
+                element.dispatchEvent(event);
+              }, sendButton);
             }
           } catch (error) {
-            console.error('Erreur lors de la recherche du bouton de réponse:', error.message);
+            console.error('Erreur lors du clic sur le bouton d\'envoi:', error.message);
+            await page.keyboard.press('Escape');
+            await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 2000)));
+            continue;
           }
-        }
-        if (!replyButton) {
-          console.log('Bouton de réponse introuvable après toutes les stratégies, passage au message suivant');
-          continue;
-        }
-        console.log('Bouton de réponse trouvé !');
-        // Clic sur le bouton de réponse
-        try {
-          await replyButton.click();
-        } catch (clickError) {
-          console.error('Erreur lors du clic sur le bouton de réponse:', clickError.message);
-          continue;
-        }
-        await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 5000)));
-        // Vérifier si la modale est ouverte
-        const modalVisible = await page.evaluate(() => {
-          return !!document.querySelector('div[role="textbox"], [contenteditable="true"], textarea');
-        });
-        if (!modalVisible) {
-          console.log('La modale de réponse ne s\'est pas ouverte correctement, on passe au message suivant');
-          continue;
-        }
-        try {
-          await page.waitForSelector('div[role="textbox"], [contenteditable="true"], textarea', { visible: true, timeout: 10000 });
-        } catch (selectorError) {
-          console.error('Erreur lors de l\'attente du champ de texte:', selectorError.message);
-          continue;
-        }
-        console.log('Saisie de la réponse...');
-        await page.type('div[role="textbox"], [contenteditable="true"], textarea', response);
-        // Cliquer sur le bouton d'envoi
-        const exactSelector = 'button.rounded-lg.font-semibold.border.border-transparent.bg-action-primary.text-light[title="Reply"]';
-        await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 1000)));
-        try {
-          let sendButton = await page.$(exactSelector);
-          if (!sendButton) {
-            sendButton = await page.$('button.rounded-lg.font-semibold[title="Reply"]');
-          }
-          if (!sendButton) {
-            sendButton = await page.$('button.bg-action-primary.text-light');
-          }
-          if (!sendButton) {
-            const buttons = await page.$$('button');
-            for (const btn of buttons) {
-              const text = await page.evaluate(el => el.textContent?.trim(), btn);
-              if (text === 'Reply') {
-                sendButton = btn;
-                break;
-              }
-            }
-          }
-          if (!sendButton) {
-            await page.evaluate(() => {
-              const buttons = Array.from(document.querySelectorAll('button'));
-              const replyButton = buttons.find(btn => btn.textContent?.trim() === 'Reply');
-              if (replyButton) {
-                replyButton.click();
-                return true;
-              }
-              return false;
-            });
-          } else {
-            await sendButton.click();
-            await page.evaluate(element => { element.click(); }, sendButton);
-            await page.evaluate(element => {
-              const event = new MouseEvent('click', { bubbles: true, cancelable: true, view: window });
-              element.dispatchEvent(event);
-            }, sendButton);
-          }
+          await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 3000)));
+          console.log('Réponse envoyée avec succès!');
+          responsesCount++;
+          // Enregistrer dans l'historique
+          replyHistory[first10] = {
+            author,
+            date: new Date().toISOString(),
+            responded: true
+          };
+          SocialActions.saveReplyHistory(replyHistory);
+          await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 5000)));
         } catch (error) {
-          console.error('Erreur lors du clic sur le bouton d\'envoi:', error.message);
-          await page.keyboard.press('Escape');
-          await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 2000)));
-          continue;
-        }
-        await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 3000)));
-        console.log('Réponse envoyée avec succès!');
-        responsesCount++;
-        // Enregistrer dans l'historique
-        replyHistory[first10] = {
-          author,
-          date: new Date().toISOString(),
-          responded: true
-        };
-        SocialActions.saveReplyHistory(replyHistory);
-        await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 5000)));
-      } catch (error) {
-        console.error(`Erreur lors du traitement du message ${i + 1}:`, error);
-        await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 3000)));
-      }
-    }
-    console.log(`Traitement terminé. Résultats: ${responsesCount} réponses envoyées, ${skippedCount} messages ignorés.`);
-    // Health check : vérifier que la page n'est pas blanche
-    try {
-      const page = await this.ensurePage();
-      // Vérifie qu'un élément clé du DOM Farcaster est présent (ex: sidebar, feed, nav, header)
-      const isHealthy = await page.evaluate(() => !!document.querySelector('.bg-sidebar, .line-clamp-feed, nav, header'));
-      if (!isHealthy) {
-        console.warn('Page blanche détectée, tentative de reload...');
-        try {
-          await page.reload({ waitUntil: 'networkidle2', timeout: 15000 });
-        } catch (reloadErr) {
-          console.warn('Reload échoué, recréation de la page Puppeteer...');
-          try { await page.close(); } catch {}
-          this.page = await getFarcasterPage();
+          console.error(`Erreur lors du traitement du message ${i + 1}:`, error);
+          await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 3000)));
         }
       }
-    } catch (healthErr) {
-      console.warn('Erreur lors du health check, tentative de recréation de la page...');
-      try { if (this.page) await this.page.close(); } catch {}
-      this.page = await getFarcasterPage();
-    }
-    return responsesCount;
-  } catch (error) {
-    console.error('Erreur lors du parcours du fil d\'accueil et des réponses:', error);
-    return responsesCount;
+      console.log(`Traitement terminé. Résultats: ${responsesCount} réponses envoyées, ${skippedCount} messages ignorés.`);
+      // Health check : vérifier que la page n'est pas blanche
+      try {
+        const page = await this.ensurePage();
+        // Vérifie qu'un élément clé du DOM Farcaster est présent (ex: sidebar, feed, nav, header)
+        const isHealthy = await page.evaluate(() => !!document.querySelector('.bg-sidebar, .line-clamp-feed, nav, header'));
+        if (!isHealthy) {
+          console.warn('Page blanche détectée, tentative de reload...');
+          try {
+            await page.reload({ waitUntil: 'networkidle2', timeout: 15000 });
+          } catch (reloadErr) {
+            console.warn('Reload échoué, recréation de la page Puppeteer...');
+            try { await page.close(); } catch { }
+            this.page = await getFarcasterPage();
+          }
+        }
+      } catch (healthErr) {
+        console.warn('Erreur lors du health check, tentative de recréation de la page...');
+        try { if (this.page) await this.page.close(); } catch { }
+        this.page = await getFarcasterPage();
+      }
+      return responsesCount;
+    } catch (error) {
+      console.error('Erreur lors du parcours du fil d\'accueil et des réponses:', error);
+      return responsesCount;
     }
   }
 }
