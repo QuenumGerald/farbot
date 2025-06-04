@@ -133,7 +133,9 @@ async function getFarcasterPage(forceNewPage = false) {
         '--no-zygote',
         '--disable-gpu',
         '--disable-extensions',
-        '--mute-audio'
+        '--mute-audio',
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
       ]
     });
   } catch (launchError) {
@@ -160,7 +162,9 @@ async function getFarcasterPage(forceNewPage = false) {
             '--no-zygote',
             '--disable-gpu',
             '--disable-extensions',
-            '--mute-audio'
+            '--mute-audio',
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
           ]
         });
       } catch (retryError) {
@@ -192,7 +196,7 @@ async function getFarcasterPage(forceNewPage = false) {
 
   try {
     // Aller directement sur Farcaster.xyz (nouveau portail)
-    await globalPage.goto('https://farcaster.xyz/', { waitUntil: 'networkidle2', timeout: 60000 });
+    await globalPage.goto('https://farcaster.xyz/', { waitUntil: 'networkidle2', timeout: 45000 });
 
     // Si on est redirigé vers un login ou qu'on voit un écran de connexion, initier le processus de connexion par email
     if (globalPage.url().includes('/login')) {
@@ -207,7 +211,7 @@ async function getFarcasterPage(forceNewPage = false) {
           const emailButtonSelector = 'button.rounded-lg.font-semibold.border.bg-action-tertiary.border-action-tertiary';
 
           // Attendre que le bouton de connexion par email soit visible
-          await globalPage.waitForSelector(emailButtonSelector, { timeout: 15000 });
+          await globalPage.waitForSelector(emailButtonSelector, { timeout: 45000 });
           console.log('>>> Bouton de connexion par email trouvé');
 
           // Cliquer sur le bouton de connexion par email
@@ -215,7 +219,7 @@ async function getFarcasterPage(forceNewPage = false) {
           console.log('>>> Clic sur le bouton de connexion par email');
 
           // Attendre que le champ d'email apparaisse
-          await globalPage.waitForSelector('input[type="email"]', { timeout: 10000 });
+          await globalPage.waitForSelector('input[type="email"]', { timeout: 45000 });
           console.log('>>> Champ email trouvé');
 
           // Saisir l'email
@@ -223,7 +227,7 @@ async function getFarcasterPage(forceNewPage = false) {
           console.log('>>> Email saisi');
 
           // Trouver et cliquer sur le bouton Continuer/Envoyer
-          await globalPage.waitForSelector('button[type="submit"]', { timeout: 10000 });
+          await globalPage.waitForSelector('button[type="submit"]', { timeout: 45000 });
           await globalPage.click('button[type="submit"]');
           console.log('>>> Clic sur Continuer');
 
@@ -239,7 +243,7 @@ async function getFarcasterPage(forceNewPage = false) {
                   text.includes('email de vérification') ||
                   text.includes('email envoyé');
               },
-              { timeout: 15000 }
+              { timeout: 45000 }
             );
             console.log('>>> Email de connexion envoyé. Veuillez vérifier votre boîte mail.');
           } catch (confirmError) {

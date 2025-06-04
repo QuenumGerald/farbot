@@ -195,7 +195,7 @@ class SocialActions {
 
       await page.goto(searchUrl, {
         waitUntil: 'networkidle2',
-        timeout: 5000
+        timeout: 45000
       });
 
       // Attendre que la page charge complètement
@@ -284,7 +284,7 @@ class SocialActions {
 
       // Attendre l'ouverture de la modale et le champ de texte
       console.log('Attente de la modale de réponse...');
-      await page.waitForSelector('div[role="textbox"], [contenteditable="true"], textarea', { visible: true, timeout: 10000 });
+      await page.waitForSelector('div[role="textbox"], [contenteditable="true"], textarea', { visible: true, timeout: 45000 });
 
       // Remplir le formulaire de réponse
       console.log('Saisie du message de réponse...');
@@ -378,7 +378,7 @@ class SocialActions {
 
       await page.goto(searchUrl, {
         waitUntil: 'networkidle2',
-        timeout: 10000
+        timeout: 45000
       });
 
       // Attendre que la page charge complètement
@@ -539,7 +539,7 @@ class SocialActions {
 
           // Saisir la réponse - utiliser try/catch pour éviter les erreurs de timeout
           try {
-            await page.waitForSelector('div[role="textbox"], [contenteditable="true"], textarea', { visible: true, timeout: 10000 });
+            await page.waitForSelector('div[role="textbox"], [contenteditable="true"], textarea', { visible: true, timeout: 45000 });
           } catch (selectorError) {
             console.error('Erreur lors de l\'attente du champ de texte:', selectorError.message);
             continue; // Passer au message suivant si le champ de texte n'est pas trouvé
@@ -687,27 +687,47 @@ class SocialActions {
       // Utiliser la page existante ou en créer une nouvelle si nécessaire
       page = await this.ensurePage(false);  // false = ne pas forcer la création d'une nouvelle page
 
-      // Rechercher des utilisateurs
+      // Recherche et scroll jusqu'à trouver des utilisateurs non suivis
       let users = [];
-      try {
-        users = await searchUsersByKeywords(keyword);
-        console.log(`Trouvé ${users.length} utilisateurs potentiels avec le mot-clé "${keyword}"`);
-      } catch (searchError) {
-        console.error(`Erreur lors de la recherche d'utilisateurs:`, searchError.message);
-        // Si une erreur se produit pendant la recherche, vérifier si la page est toujours valide
+      let lastUsersCount = 0;
+      let scrollAttempts = 0;
+      const maxScrollAttempts = 10; // Limite de sécurité pour éviter boucle infinie
+      let foundFollowable = false;
+
+      while (scrollAttempts < maxScrollAttempts && !foundFollowable) {
         try {
-          // Tenter une navigation simple pour vérifier si la page est valide
-          await page.goto('https://farcaster.xyz/', { waitUntil: 'networkidle2', timeout: 45000 });
-        } catch (pageError) {
-          console.error('Page non valide, réinitialisation nécessaire');
-          // Réinitialiser la page complètement
-          page = await this.ensurePage(true); // Forcer la création d'une nouvelle page
-          return followCount;
+          users = await searchUsersByKeywords(keyword);
+          console.log(`[Scroll ${scrollAttempts}] ${users.length} utilisateurs trouvés avec le mot-clé "${keyword}"`);
+        } catch (searchError) {
+          console.error(`[Scroll ${scrollAttempts}] Erreur lors de la recherche d'utilisateurs:`, searchError.message);
+          break;
         }
+        // Cherche au moins un utilisateur non suivi
+        for (const user of users) {
+          const username = user.username || user.displayName || '';
+          if (!username) continue;
+          const userKey = username.toLowerCase();
+          // Vérifie l'historique local ET la page (bouton Following)
+          if (!followHistory[userKey]) {
+            foundFollowable = true;
+            break;
+          }
+        }
+        if (!foundFollowable) {
+          // Scroll pour charger plus d'utilisateurs
+          await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+          await page.waitForTimeout(2000);
+        }
+        if (users.length === lastUsersCount) {
+          console.log('Plus de nouveaux utilisateurs à charger, arrêt du scroll.');
+          break;
+        }
+        lastUsersCount = users.length;
+        scrollAttempts++;
       }
 
-      // Si aucun utilisateur trouvé, terminer
-      if (users.length === 0) {
+      if (!foundFollowable) {
+        console.log('Aucun utilisateur followable trouvé après scroll.');
         return followCount;
       }
 
@@ -773,88 +793,65 @@ class SocialActions {
 
           // Utiliser un sélecteur CSS plus précis basé sur les classes du bouton
           const followBtnSelector = 'button.rounded-lg.font-semibold.border.border-transparent.bg-action-primary.text-light';
-          await page.waitForSelector(followBtnSelector, { timeout: 15000 });
+          await page.waitForSelector(followBtnSelector, { timeout: 45000 });
           console.log(`Bouton Follow détecté sur le profil de ${username}`);
         } catch (error) {
           console.error('Impossible de trouver le bouton Follow sur le profil:', error.message);
           continue;
         }
 
-        // Vérifier si on suit déjà l'utilisateur
-        const isFollowing = await page.evaluate(() => {
-          // Chercher d'abord le bouton 'Following'
-          const followingButton = Array.from(document.querySelectorAll('button'))
-            .find(btn => btn.textContent && btn.textContent.trim() === 'Following');
-          return !!followingButton;
-        });
+        // Vérifier si on suit déjà l'utilisateur (bouton 'Following' présent)
+        const isFollowing = await page.evaluate((uname) => {
+          const btns = Array.from(document.querySelectorAll('button'));
+          return btns.some(btn => btn.textContent && btn.textContent.trim() === 'Following');
+        }, username);
 
         if (isFollowing) {
-          console.log(`On suit déjà ${username}, on passe au suivant`);
-          // Mettre à jour la date du follow dans l'historique
+          console.log(`[${username}] Déjà suivi (bouton 'Following' détecté), on passe au suivant`);
           followHistory[userKey] = { date: new Date().toISOString() };
           continue;
         }
 
-        // Essayer de cliquer sur le bouton Follow avec plus de robustesse
+        // Essayer de cliquer sur le bouton Follow SANS jamais cliquer sur 'Message'
         try {
-          // Double vérification que le frame est toujours valide
+          // Vérifie la validité du frame
           try { await page.title(); } catch (e) {
             console.log(`Frame détaché juste avant le clic pour ${username}, on réessaie...`);
             page = await this.ensurePage(true);
             await this.navigateWithRetries(`https://farcaster.xyz/${username}`);
-            // Si encore des problèmes, on passe au suivant
             continue;
           }
+          await page.waitForTimeout(500);
 
-          // Attendre un peu avant d'essayer de cliquer
-          await page.evaluate(() => new Promise(r => setTimeout(r, 1000)));
-
-          // Essayer d'abord avec la méthode evaluate (plus fiable)
-          let clickSuccess = await page.evaluate(() => {
+          // Recherche du bouton Follow par texte ET classe
+          const followBtnSelector = 'button.rounded-lg.font-semibold.border.border-transparent.bg-action-primary.text-light';
+          const followBtn = await page.$x(`//button[contains(@class, 'rounded-lg') and contains(@class, 'font-semibold') and contains(@class, 'bg-action-primary') and normalize-space(text())='Follow']`);
+          let clickSuccess = false;
+          if (followBtn && followBtn.length > 0) {
+            await followBtn[0].click();
+            clickSuccess = true;
+          } else {
+            // Fallback : méthode CSS classique
             try {
-              const followBtn = Array.from(document.querySelectorAll('button.rounded-lg.font-semibold.border.border-transparent.bg-action-primary.text-light'))
-                .find(btn => btn.textContent && btn.textContent.trim() === 'Follow');
-
-              if (followBtn) {
-                followBtn.click();
-                return true;
-              }
-            } catch (e) { /* ignorer les erreurs internes */ }
-            return false;
-          });
-
-          // Si ça n'a pas marché, essayer avec un clic direct sur le sélecteur
-          if (!clickSuccess) {
-            try {
-              const followBtnSelector = 'button.rounded-lg.font-semibold.border.border-transparent.bg-action-primary.text-light';
               await page.click(followBtnSelector);
               clickSuccess = true;
-            } catch (clickErr) {
-              console.log(`Tentative de clic direct échouée pour ${username}: ${clickErr.message}`);
+            } catch (err) {
+              console.log(`[${username}] Aucun bouton Follow cliquable trouvé (ni XPath ni CSS)`);
             }
           }
-
           if (clickSuccess) {
-            // Attendre la confirmation du suivi
-            await page.evaluate(() => new Promise(r => setTimeout(r, 2000)));
-            console.log(`Suivi de l'utilisateur ${username} réussi !`);
+            await page.waitForTimeout(2000);
+            console.log(`[${username}] Clic sur Follow réussi !`);
             followCount++;
-
-            // Mettre à jour l'historique des follows
             followHistory[userKey] = { date: new Date().toISOString() };
-
-            // Sauvegarder l'historique après chaque follow réussi
             SocialActions.saveFollowHistory(followHistory);
-
-            // Attendre un peu plus longtemps avant de passer à l'utilisateur suivant (anti-bot)
-            await new Promise(resolve => setTimeout(resolve, 5000));
+            await page.waitForTimeout(5000);
           } else {
-            console.log(`Bouton Follow non trouvé ou non cliquable pour ${username}`);
+            console.log(`[${username}] Bouton Follow non trouvé ou non cliquable, on passe au suivant`);
             continue;
           }
-
         } catch (error) {
-          console.error(`Erreur lors du suivi de ${username}:`, error.message);
+          console.error(`[${username}] Erreur lors du clic sur Follow:`, error.message);
         }
       }
 
@@ -990,7 +987,7 @@ class SocialActions {
             continue;
           }
           try {
-            await page.waitForSelector('div[role="textbox"], [contenteditable="true"], textarea', { visible: true, timeout: 10000 });
+            await page.waitForSelector('div[role="textbox"], [contenteditable="true"], textarea', { visible: true, timeout: 45000 });
           } catch (selectorError) {
             console.error('Erreur lors de l\'attente du champ de texte:', selectorError.message);
             continue;
@@ -1067,7 +1064,7 @@ class SocialActions {
         if (!isHealthy) {
           console.warn('Page blanche détectée, tentative de reload...');
           try {
-            await page.reload({ waitUntil: 'networkidle2', timeout: 15000 });
+            await page.reload({ waitUntil: 'networkidle2', timeout: 45000 });
           } catch (reloadErr) {
             console.warn('Reload échoué, recréation de la page Puppeteer...');
             try { await page.close(); } catch { }
