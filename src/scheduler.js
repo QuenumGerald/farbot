@@ -139,7 +139,7 @@ cron.schedule('*/30 * * * *', async () => {
 });
 
 // Tâche pour suivre automatiquement des utilisateurs toutes les minutes
-cron.schedule('*/5 * * * *', async () => {
+cron.schedule('*/1 * * * *', async () => {
   // Vérifier si la fonctionnalité de suivi est activée dans la configuration
   const config = (await import('./config/index.js')).default;
 

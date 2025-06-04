@@ -3,9 +3,9 @@
 // Ajoute ta clé API DeepSeek dans la variable d'environnement DEEPSEEK_API_KEY
 
 // Service DeepSeek (avec fallback OpenAI) pour génération de texte Clippy
-import axios from 'axios';
 import dotenv from 'dotenv';
-dotenv.config();
+dotenv.config({ path: '../.env' });
+import axios from 'axios';
 
 const DEEPSEEK_KEY = process.env.DEEPSEEK_KEY || process.env.DEEPSEEK_API_KEY;
 const OPENAI_KEY = process.env.OPENAI_KEY;

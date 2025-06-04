@@ -716,7 +716,7 @@ class SocialActions {
         if (!foundFollowable) {
           // Scroll pour charger plus d'utilisateurs
           await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-          await page.waitForTimeout(2000);
+          await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 2000)));
         }
         if (users.length === lastUsersCount) {
           console.log('Plus de nouveaux utilisateurs à charger, arrêt du scroll.');
@@ -774,11 +774,8 @@ class SocialActions {
 
         // Attendre le chargement complet et vérifier la présence du bouton
         try {
-          // Attendre d'abord que la page soit complètement chargée et statisée pour éviter les frames détachés
-          await page.evaluate(() => new Promise(resolve => {
-            // Attendre que la page soit stable
-            setTimeout(resolve, 3000);
-          }));
+          // Attendre d'abord que la page soit complètement chargée et stabilisée pour éviter les frames détachés
+          await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 3000)));
 
           // S'assurer que le frame est toujours valide avant de continuer
           try {
@@ -791,68 +788,86 @@ class SocialActions {
             await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 3000)));
           }
 
+          // --- Correction ici : vérifier le bouton 'Following' AVANT de tenter le follow ---
+          const isFollowing = await page.evaluate(() => {
+            const followingButton = Array.from(document.querySelectorAll('button'))
+              .find(btn => btn.textContent && btn.textContent.trim() === 'Following');
+            return !!followingButton;
+          });
+          if (isFollowing) {
+            console.log(`[${username}] Déjà suivi sur la page profil, on passe au suivant.`);
+            // Mettre à jour l'historique local si besoin
+            followHistory[userKey] = { date: new Date().toISOString() };
+            SocialActions.saveFollowHistory(followHistory);
+            continue;
+          }
+          // --- Fin correction ---
+
           // Utiliser un sélecteur CSS plus précis basé sur les classes du bouton
           const followBtnSelector = 'button.rounded-lg.font-semibold.border.border-transparent.bg-action-primary.text-light';
+          await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 2000)));
           await page.waitForSelector(followBtnSelector, { timeout: 45000 });
-          console.log(`Bouton Follow détecté sur le profil de ${username}`);
+          const followButton = await page.$(followBtnSelector);
+          if (followButton) {
+            const btnText = await page.evaluate(el => el.textContent.trim(), followButton);
+            if (btnText === 'Unfollow' || btnText === 'Following') {
+              console.log(`[${username}] Déjà suivi (bouton: ${btnText}), on passe au suivant`);
+              followHistory[userKey] = { date: new Date().toISOString() };
+              SocialActions.saveFollowHistory(followHistory);
+              continue;
+            } else if (btnText === 'Follow') {
+              console.log(`Bouton Follow détecté sur le profil de ${username}`);
+            } else {
+              console.log(`[${username}] Bouton détecté mais texte inattendu ('${btnText}'), on passe au suivant`);
+              continue;
+            }
+          } else {
+            console.log(`[${username}] Aucun bouton Follow détecté sur le header du profil, on passe au suivant`);
+            continue;
+          }
+
         } catch (error) {
           console.error('Impossible de trouver le bouton Follow sur le profil:', error.message);
           continue;
-        }
-
-        // Vérifier si on suit déjà l'utilisateur (bouton 'Following' présent)
-        const isFollowing = await page.evaluate((uname) => {
-          const btns = Array.from(document.querySelectorAll('button'));
-          return btns.some(btn => btn.textContent && btn.textContent.trim() === 'Following');
-        }, username);
-
-        if (isFollowing) {
-          console.log(`[${username}] Déjà suivi (bouton 'Following' détecté), on passe au suivant`);
-          followHistory[userKey] = { date: new Date().toISOString() };
-          continue;
-        }
-
-        // Essayer de cliquer sur le bouton Follow SANS jamais cliquer sur 'Message'
-        try {
-          // Vérifie la validité du frame
-          try { await page.title(); } catch (e) {
-            console.log(`Frame détaché juste avant le clic pour ${username}, on réessaie...`);
-            page = await this.ensurePage(true);
-            await this.navigateWithRetries(`https://farcaster.xyz/${username}`);
-            continue;
-          }
-          await page.waitForTimeout(500);
-
-          // Recherche du bouton Follow par texte ET classe
-          const followBtnSelector = 'button.rounded-lg.font-semibold.border.border-transparent.bg-action-primary.text-light';
-          const followBtn = await page.$x(`//button[contains(@class, 'rounded-lg') and contains(@class, 'font-semibold') and contains(@class, 'bg-action-primary') and normalize-space(text())='Follow']`);
-          let clickSuccess = false;
-          if (followBtn && followBtn.length > 0) {
-            await followBtn[0].click();
-            clickSuccess = true;
-          } else {
-            // Fallback : méthode CSS classique
             try {
-              await page.click(followBtnSelector);
-              clickSuccess = true;
-            } catch (err) {
-              console.log(`[${username}] Aucun bouton Follow cliquable trouvé (ni XPath ni CSS)`);
+              await page.title();
+            } catch (frameError) {
+              console.error(`Frame détaché avant le clic sur Follow pour ${username}`);
+              await this.navigateWithRetries(`https://farcaster.xyz/${username}`);
+              continue;
+            }
+            await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 500)));
+
+            // Recherche du bouton Follow dans le header de profil uniquement
+            const followBtnSelector = '#root > div > div > main > div > div > div.p-4 > div button.rounded-lg.font-semibold.border.border-transparent.bg-action-primary.text-light';
+            const followButton = await page.$(followBtnSelector);
+            let clickSuccess = false;
+            if (followButton) {
+              const btnText = await page.evaluate(el => el.textContent.trim(), followButton);
+              if (btnText === 'Unfollow' || btnText === 'Following') {
+                console.log(`[${username}] Déjà suivi (bouton: ${btnText}), on passe au suivant`);
+                followHistory[userKey] = { date: new Date().toISOString() };
+                SocialActions.saveFollowHistory(followHistory);
+                continue;
+              }
+              if (btnText === 'Follow') {
+                await followButton.click();
+                clickSuccess = true;
+              }
+            }
+            if (clickSuccess) {
+              await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 2000)));
+              console.log(`[${username}] Clic sur Follow réussi !`);
+              followCount++;
+              followHistory[userKey] = { date: new Date().toISOString() };
+              SocialActions.saveFollowHistory(followHistory);
+              await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 3000)));
+            } else {
+              console.log(`[${username}] Bouton Follow non trouvé ou non cliquable, on passe au suivant`);
+              continue;
             }
           }
-          if (clickSuccess) {
-            await page.waitForTimeout(2000);
-            console.log(`[${username}] Clic sur Follow réussi !`);
-            followCount++;
-            followHistory[userKey] = { date: new Date().toISOString() };
-            SocialActions.saveFollowHistory(followHistory);
-            await page.waitForTimeout(5000);
-          } else {
-            console.log(`[${username}] Bouton Follow non trouvé ou non cliquable, on passe au suivant`);
-            continue;
-          }
-        } catch (error) {
-          console.error(`[${username}] Erreur lors du clic sur Follow:`, error.message);
-        }
+
       }
 
       // Retourner le nombre d'utilisateurs suivis avec succès

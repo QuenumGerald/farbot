@@ -1,0 +1,57 @@
+2025/06/05-00:10:01.618 2f398 Reusing MANIFEST /home/nova/Documents/projects/farbot/src/user_data/persistent_profile/Default/Local Storage/leveldb/MANIFEST-000001
+2025/06/05-00:10:01.624 2f398 Recovering log #201
+2025/06/05-00:10:01.624 2f398 Reusing old log /home/nova/Documents/projects/farbot/src/user_data/persistent_profile/Default/Local Storage/leveldb/000201.log 
+2025/06/05-00:10:09.667 2f398 Level-0 table #205: started
+2025/06/05-00:10:09.679 2f398 Level-0 table #205: 110471 bytes OK
+2025/06/05-00:10:09.687 2f398 Delete type=0 #201
+2025/06/05-00:10:09.688 2f398 Compacting 4@0 + 1@1 files
+2025/06/05-00:10:09.699 2f398 Generated table #206@0: 498 keys, 135854 bytes
+2025/06/05-00:10:09.700 2f398 Compacted 4@0 + 1@1 files => 135854 bytes
+2025/06/05-00:10:09.706 2f398 compacted to: files[ 0 1 1 0 0 0 0 ]
+2025/06/05-00:10:09.708 2f398 Delete type=2 #194
+2025/06/05-00:10:09.708 2f398 Delete type=2 #202
+2025/06/05-00:10:09.708 2f398 Delete type=2 #199
+2025/06/05-00:10:09.708 2f398 Delete type=2 #205
+2025/06/05-00:10:09.708 2f398 Delete type=2 #196
+2025/06/05-00:10:11.245 2f399 Level-0 table #208: started
+2025/06/05-00:10:11.256 2f399 Level-0 table #208: 49981 bytes OK
+2025/06/05-00:10:11.266 2f399 Delete type=0 #204
+2025/06/05-00:11:01.639 2f398 Level-0 table #210: started
+2025/06/05-00:11:01.648 2f398 Level-0 table #210: 66627 bytes OK
+2025/06/05-00:11:01.658 2f398 Delete type=0 #207
+2025/06/05-00:12:03.616 2f399 Level-0 table #212: started
+2025/06/05-00:12:03.635 2f399 Level-0 table #212: 186439 bytes OK
+2025/06/05-00:12:03.645 2f399 Delete type=0 #209
+2025/06/05-00:12:36.767 2f399 Level-0 table #214: started
+2025/06/05-00:12:36.826 2f399 Level-0 table #214: 192319 bytes OK
+2025/06/05-00:12:36.833 2f399 Delete type=0 #211
+2025/06/05-00:12:36.834 2f399 Compacting 4@0 + 1@1 files
+2025/06/05-00:12:36.844 2f399 Generated table #215@0: 536 keys, 217868 bytes
+2025/06/05-00:12:36.844 2f399 Compacted 4@0 + 1@1 files => 217868 bytes
+2025/06/05-00:12:36.850 2f399 compacted to: files[ 0 1 1 0 0 0 0 ]
+2025/06/05-00:12:36.851 2f399 Delete type=2 #206
+2025/06/05-00:12:36.851 2f399 Delete type=2 #212
+2025/06/05-00:12:36.851 2f399 Delete type=2 #208
+2025/06/05-00:12:36.851 2f399 Delete type=2 #214
+2025/06/05-00:12:36.851 2f399 Delete type=2 #210
+2025/06/05-00:13:03.617 2f399 Level-0 table #217: started
+2025/06/05-00:13:03.630 2f399 Level-0 table #217: 117623 bytes OK
+2025/06/05-00:13:03.640 2f399 Delete type=0 #213
+2025/06/05-00:13:51.333 2f399 Level-0 table #219: started
+2025/06/05-00:13:51.348 2f399 Level-0 table #219: 137664 bytes OK
+2025/06/05-00:13:51.358 2f399 Delete type=0 #216
+2025/06/05-00:14:03.614 2f399 Level-0 table #221: started
+2025/06/05-00:14:03.621 2f399 Level-0 table #221: 49039 bytes OK
+2025/06/05-00:14:03.629 2f399 Delete type=0 #218
+2025/06/05-00:14:06.189 2f399 Level-0 table #223: started
+2025/06/05-00:14:06.198 2f399 Level-0 table #223: 53698 bytes OK
+2025/06/05-00:14:06.207 2f399 Delete type=0 #220
+2025/06/05-00:14:06.207 2f399 Compacting 4@0 + 1@1 files
+2025/06/05-00:14:06.217 2f399 Generated table #224@0: 581 keys, 81260 bytes
+2025/06/05-00:14:06.217 2f399 Compacted 4@0 + 1@1 files => 81260 bytes
+2025/06/05-00:14:06.224 2f399 compacted to: files[ 0 1 1 0 0 0 0 ]
+2025/06/05-00:14:06.225 2f399 Delete type=2 #221
+2025/06/05-00:14:06.225 2f399 Delete type=2 #217
+2025/06/05-00:14:06.225 2f399 Delete type=2 #215
+2025/06/05-00:14:06.225 2f399 Delete type=2 #223
+2025/06/05-00:14:06.225 2f399 Delete type=2 #219

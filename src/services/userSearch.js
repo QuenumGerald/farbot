@@ -44,7 +44,15 @@ export async function searchUsersByKeywords(keyword) {
     
     // Attendre que la page charge complètement
     await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 3000)));
-    
+
+    // --- Ajout scroll automatique pour charger plus de profils ---
+    const scrollTimes = 5;
+    for (let i = 0; i < scrollTimes; i++) {
+      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+      await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 1500)));
+    }
+    // --- Fin scroll ---
+
     // Extraire les utilisateurs de la page avec un sélecteur générique pour les profils d'utilisateurs
     const users = await page.evaluate(() => {
       const results = [];

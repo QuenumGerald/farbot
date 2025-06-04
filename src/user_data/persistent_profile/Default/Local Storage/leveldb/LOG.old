@@ -1,0 +1,8 @@
+2025/06/05-00:09:46.924 2f25a Reusing MANIFEST /home/nova/Documents/projects/farbot/src/user_data/persistent_profile/Default/Local Storage/leveldb/MANIFEST-000001
+2025/06/05-00:09:46.929 2f25a Recovering log #197
+2025/06/05-00:09:46.930 2f25a Level-0 table #199: started
+2025/06/05-00:09:46.957 2f25a Level-0 table #199: 111320 bytes OK
+2025/06/05-00:09:46.969 2f25a Delete type=0 #197
+2025/06/05-00:09:57.721 2f25a Level-0 table #202: started
+2025/06/05-00:09:57.735 2f25a Level-0 table #202: 109129 bytes OK
+2025/06/05-00:09:57.751 2f25a Delete type=0 #200

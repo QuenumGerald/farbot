@@ -124,7 +124,7 @@ async function getFarcasterPage(forceNewPage = false) {
   console.log('>>> Lancement du navigateur Puppeteer');
   try {
     globalBrowser = await puppeteer.launch({
-      headless: true, // false pour debug, true en production
+      headless: false, // false pour debug visuel, true en production
       userDataDir: persistentUserDataDir,
       args: [
         '--disable-dev-shm-usage',

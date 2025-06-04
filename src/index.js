@@ -1,7 +1,7 @@
 console.log('>>> Début absolu de index.js');
 import dotenv from 'dotenv';
 console.log('>>> Après import dotenv');
-dotenv.config();
+dotenv.config({ path: '../.env' });
 console.log('>>> Après dotenv.config()');
 import express from 'express';
 console.log('>>> Après import express');
